@@ -13,11 +13,10 @@ import net.minecraft.util.math.Vec3d;
 import java.util.List;
 
 /**
- * Free Fire / Tactical Style Minimap:
- *  - Fixed North-Up Map (North is always UP, never spins around).
- *  - Player represented by a rotating Green Directional Arrow at the center.
- *  - Spawners shown as bright Red Dots (with white border) moving smoothly as you walk.
- *  - Top-left text overlay showing nearest spawner coordinates and distance.
+ * Free Fire / Tactical Style Minimap & HUD:
+ *  1. Top-left text summary listing detected spawners with coords and distance.
+ *  2. Middle-top player coordinate overlay (XYZ: X / Y / Z).
+ *  3. Top-right minimap radar with fixed North-Up orientation and rotating Green Player Arrow.
  */
 public class HUDRadarRenderer {
 
@@ -41,6 +40,7 @@ public class HUDRadarRenderer {
         TextRenderer tr = mc.textRenderer;
 
         renderTextList(ctx, tr, spawners);
+        renderMiddleTopCoords(ctx, mc, tr);
         renderRadar(ctx, mc, tr, spawners);
     }
 
@@ -70,6 +70,27 @@ public class HUDRadarRenderer {
             ctx.drawTextWithShadow(tr,
                     "§8  … and " + (spawners.size() - limit) + " more", x, y, COL_EMPTY);
         }
+    }
+
+    /**
+     * Renders player coordinates (XYZ) centered at the top middle of the screen.
+     */
+    private static void renderMiddleTopCoords(DrawContext ctx, MinecraftClient mc, TextRenderer tr) {
+        if (mc.player == null) return;
+
+        BlockPos p = mc.player.getBlockPos();
+        String text = String.format("§7XYZ: §e%d §7/ §e%d §7/ §e%d", p.getX(), p.getY(), p.getZ());
+        int textWidth = tr.getWidth(text);
+        int screenW = mc.getWindow().getScaledWidth();
+
+        int x = (screenW - textWidth) / 2;
+        int y = 10;
+
+        // Dark background bar for high contrast
+        ctx.fill(x - 6, y - 3, x + textWidth + 6, y + 11, 0xAA000000);
+        ctx.drawBorder(x - 6, y - 3, textWidth + 12, 14, 0xFF555555);
+
+        ctx.drawTextWithShadow(tr, text, x, y, 0xFFFFFFFF);
     }
 
     private static void renderRadar(DrawContext ctx, MinecraftClient mc, TextRenderer tr, List<SpawnerInfo> spawners) {
@@ -137,7 +158,6 @@ public class HUDRadarRenderer {
      * Renders a crisp green directional player arrow pointing in the direction of the player's yaw.
      */
     private static void renderPlayerArrow(DrawContext ctx, int cx, int cy, float yaw) {
-        // In MC: 0 = South (+Z, Down), 90 = West (-X, Left), 180 = North (-Z, Up), 270 = East (+X, Right)
         double rad = Math.toRadians(yaw);
 
         // Forward unit vector
