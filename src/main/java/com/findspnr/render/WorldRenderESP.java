@@ -22,9 +22,10 @@ import java.lang.reflect.Method;
 import java.util.List;
 
 /**
- * 3D World ESP Renderer:
- * Renders glowing red bounding box outlines around spawner blocks.
- * Uses Tessellator + RenderSystem.disableDepthTest() so lines render 100% THROUGH WALLS.
+ * 3D World ESP & Tracer Lines Renderer:
+ *  1. Renders a thin red tracer thread connecting player camera directly to each spawner.
+ *  2. Renders a bright red 3D bounding box outline around each spawner block.
+ *  3. Uses RenderSystem.disableDepthTest() so lines & tracers render 100% THROUGH WALLS.
  */
 public class WorldRenderESP {
 
@@ -48,8 +49,8 @@ public class WorldRenderESP {
         MatrixStack matrices = context.matrixStack();
 
         matrices.push();
-        matrices.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
+        // Disable depth test so tracers & boxes render see-through through all blocks
         RenderSystem.disableDepthTest();
         RenderSystem.depthMask(false);
         RenderSystem.enableBlend();
@@ -63,16 +64,23 @@ public class WorldRenderESP {
 
         for (SpawnerInfo spawner : spawners) {
             BlockPos pos = spawner.getPos();
-            
-            // Outer 1x1x1 spawner box outline (Bright Red)
-            drawBoxOutline(bufferBuilder, matrix, pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1, 1.0f, 0.0f, 0.0f, 1.0f);
-            
-            // Inner core box outline (Bright Red)
-            double cx = pos.getX() + 0.5;
-            double cy = pos.getY() + 0.5;
-            double cz = pos.getZ() + 0.5;
+
+            // Center position of spawner relative to camera
+            double targetX = pos.getX() + 0.5 - cameraPos.x;
+            double targetY = pos.getY() + 0.5 - cameraPos.y;
+            double targetZ = pos.getZ() + 0.5 - cameraPos.z;
+
+            // 1. Tracer line (thin red thread from camera center (0,0,0) to spawner center)
+            line(bufferBuilder, matrix, 0f, -0.1f, 0f, (float) targetX, (float) targetY, (float) targetZ, 1.0f, 0.0f, 0.0f, 1.0f);
+
+            // 2. Outer 1x1x1 spawner box outline (Bright Red)
+            drawBoxOutline(bufferBuilder, matrix, targetX - 0.5, targetY - 0.5, targetZ - 0.5,
+                           targetX + 0.5, targetY + 0.5, targetZ + 0.5, 1.0f, 0.0f, 0.0f, 1.0f);
+
+            // 3. Inner core box (Bright Yellow/Red)
             double s = 0.15;
-            drawBoxOutline(bufferBuilder, matrix, cx - s, cy - s, cz - s, cx + s, cy + s, cz + s, 1.0f, 0.3f, 0.3f, 1.0f);
+            drawBoxOutline(bufferBuilder, matrix, targetX - s, targetY - s, targetZ - s,
+                           targetX + s, targetY + s, targetZ + s, 1.0f, 0.8f, 0.0f, 1.0f);
         }
 
         BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
