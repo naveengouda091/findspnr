@@ -1,6 +1,7 @@
 package com.findspnr.tracker;
 
 import com.findspnr.config.ModConfig;
+import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.MobSpawnerBlockEntity;
@@ -15,45 +16,44 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Scans loaded chunks every 10 ticks (~0.5 s) for MobSpawnerBlockEntities
- * and keeps a live {@link ConcurrentHashMap} of what was found.
+ * Dual-Mode Spawner & Dungeon Tracker:
+ *
+ * Mode 1: Direct MobSpawnerBlockEntity & BlockState scanner (for Singleplayer & Vanilla servers).
+ * Mode 2: SeedCracker Dungeon Structure Detector (scans for underground Mossy Cobblestone +
+ *         Cobblestone floor patterns — bypasses Paper/Spigot Anti-Xray Engine Mode 2!).
  */
 public class SpawnerTracker {
 
     private static final ConcurrentHashMap<BlockPos, SpawnerInfo> detected = new ConcurrentHashMap<>();
     private static int tickCounter = 0;
 
-    // ── Called from the tick event ─────────────────────────────────────────────
-
     public static void tick(MinecraftClient client) {
         if (!ModConfig.enabled || client.world == null || client.player == null) return;
 
         tickCounter++;
 
-        // Full chunk scan every 10 ticks
+        // Full scan every 10 ticks (~0.5s)
         if (tickCounter % 10 == 0) {
             scanChunks(client.world, client.player.getPos());
         }
 
-        // Update distances every tick so the radar is smooth
+        // Update distances every tick for smooth radar rendering
         Vec3d playerPos = client.player.getPos();
         for (SpawnerInfo info : detected.values()) {
             info.updateDistance(playerPos);
         }
     }
 
-    // ── Chunk scanner ──────────────────────────────────────────────────────────
-
     private static void scanChunks(ClientWorld world, Vec3d playerPos) {
         ChunkPos playerChunk = new ChunkPos(BlockPos.ofFloored(playerPos));
         int radius = ModConfig.scanRadiusChunks;
 
-        // Remove stale entries (block is no longer a spawner in a loaded chunk)
+        // Clean up removed spawners
         detected.entrySet().removeIf(entry -> {
             BlockPos p = entry.getKey();
-            // Keep if chunk is unloaded – avoids false negatives on boundary
             if (!world.isChunkLoaded(p.getX() >> 4, p.getZ() >> 4)) return false;
-            return world.getBlockState(p).getBlock() != Blocks.SPAWNER;
+            BlockState state = world.getBlockState(p);
+            return state.isAir(); // Only remove if block was broken
         });
 
         // Scan surrounding loaded chunks
@@ -65,41 +65,94 @@ public class SpawnerTracker {
                 if (!world.isChunkLoaded(cx, cz)) continue;
 
                 WorldChunk chunk = world.getChunk(cx, cz);
+
+                // ── METHOD 1: Direct Block Entity Scan ─────────────────────────────────
                 for (BlockEntity be : chunk.getBlockEntities().values()) {
-                    if (!(be instanceof MobSpawnerBlockEntity spawnerBe)) continue;
+                    if (be instanceof MobSpawnerBlockEntity spawnerBe) {
+                        BlockPos pos = spawnerBe.getPos();
+                        String entityType = "unknown";
 
-                    BlockPos pos = spawnerBe.getPos();
-                    String entityType = "unknown";
+                        try {
+                            var logic = spawnerBe.getLogic();
+                            if (logic != null) {
+                                var entity = logic.getRenderedEntity(world, pos);
+                                if (entity != null) {
+                                    entityType = entity.getType().getUntranslatedName();
+                                }
+                            }
+                        } catch (Exception ignored) {}
 
-                    // Try to read what entity the spawner contains
-                    try {
-                        var logic = spawnerBe.getLogic();
-                        if (logic != null) {
-                            var entity = logic.getRenderedEntity(world, pos);
-                            if (entity != null) {
-                                entityType = entity.getType().getUntranslatedName();
+                        SpawnerInfo info = new SpawnerInfo(pos, entityType);
+                        info.updateDistance(playerPos);
+                        detected.put(pos, info);
+                    }
+                }
+
+                // ── METHOD 2 & 3: Anti-Xray Block & Dungeon Floor Structure Scan ─────
+                int startX = chunk.getPos().getStartX();
+                int startZ = chunk.getPos().getStartZ();
+
+                for (int y = -59; y <= 50; y++) {
+                    for (int x = 0; x < 16; x++) {
+                        for (int z = 0; z < 16; z++) {
+                            BlockPos pos = new BlockPos(startX + x, y, startZ + z);
+                            BlockState state = world.getBlockState(pos);
+
+                            if (state.isOf(Blocks.SPAWNER)) {
+                                SpawnerInfo info = new SpawnerInfo(pos, "Monster");
+                                info.updateDistance(playerPos);
+                                detected.putIfAbsent(pos, info);
+                            } else if (state.isOf(Blocks.MOSSY_COBBLESTONE)) {
+                                checkDungeonFloor(world, pos, playerPos);
                             }
                         }
-                    } catch (Exception ignored) {}
-
-                    SpawnerInfo info = new SpawnerInfo(pos, entityType);
-                    info.updateDistance(playerPos);
-                    detected.put(pos, info);
+                    }
                 }
             }
         }
     }
 
-    // ── Public accessors ───────────────────────────────────────────────────────
+    /**
+     * SeedCracker Dungeon Structure Detector:
+     * Checks if a mossy cobblestone block belongs to a 5x5 to 7x7 underground dungeon floor.
+     * Paper/Spigot Anti-Xray servers hide the spawner block itself, but NEVER hide cobblestone
+     * or mossy cobblestone!
+     */
+    private static void checkDungeonFloor(ClientWorld world, BlockPos mossyPos, Vec3d playerPos) {
+        int y = mossyPos.getY();
+        if (y > 50 || y < -59) return;
 
-    /** Returns all detected spawners sorted by distance (closest first). */
+        int cobbleCount = 0;
+        int mossyCount = 0;
+
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                BlockState s = world.getBlockState(new BlockPos(mossyPos.getX() + dx, y, mossyPos.getZ() + dz));
+                if (s.isOf(Blocks.MOSSY_COBBLESTONE)) mossyCount++;
+                else if (s.isOf(Blocks.COBBLESTONE)) cobbleCount++;
+            }
+        }
+
+        // Dungeon floor: 5x5 area has at least 14 cobblestone/mossy blocks and at least 2 mossy
+        if (cobbleCount + mossyCount >= 14 && mossyCount >= 2) {
+            BlockState above = world.getBlockState(new BlockPos(mossyPos.getX(), y + 1, mossyPos.getZ()));
+            if (above.isAir() || above.isOf(Blocks.SPAWNER) || above.isOf(Blocks.WATER) || above.isOf(Blocks.CHEST)) {
+                BlockPos spawnerPos = new BlockPos(mossyPos.getX(), y + 1, mossyPos.getZ());
+                if (!detected.containsKey(spawnerPos)) {
+                    SpawnerInfo info = new SpawnerInfo(spawnerPos, "Dungeon");
+                    info.updateDistance(playerPos);
+                    detected.put(spawnerPos, info);
+                }
+            }
+        }
+    }
+
     public static List<SpawnerInfo> getDetectedSpawners() {
         List<SpawnerInfo> list = new ArrayList<>(detected.values());
         list.sort(Comparator.comparingDouble(SpawnerInfo::getDistance));
         return Collections.unmodifiableList(list);
     }
 
-    /** Wipes all cached spawners (e.g. on world disconnect). */
     public static void clear() {
         detected.clear();
         tickCounter = 0;
