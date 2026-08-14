@@ -83,7 +83,15 @@ public class WorldRenderESP {
     }
 
     private static void line(VertexConsumer consumer, Matrix4f matrix, float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a) {
-        consumer.vertex(matrix, x1, y1, z1).color(r, g, b, a);
-        consumer.vertex(matrix, x2, y2, z2).color(r, g, b, a);
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+        float dz = z2 - z1;
+        float len = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        float nx = len > 0 ? dx / len : 0f;
+        float ny = len > 0 ? dy / len : 1f;
+        float nz = len > 0 ? dz / len : 0f;
+
+        consumer.vertex(matrix, x1, y1, z1).color(r, g, b, a).normal(nx, ny, nz);
+        consumer.vertex(matrix, x2, y2, z2).color(r, g, b, a).normal(nx, ny, nz);
     }
 }
