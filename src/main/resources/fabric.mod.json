@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "findspnr",
+  "version": "${version}",
+
+  "name": "FindSpnr – Dungeon Radar",
+  "description": "Client-side mod that scans loaded chunks for monster spawners (dungeons) and renders bright-red dots on a HUD radar and 3-D world ESP — SeedCracker style.",
+  "authors": ["bevin"],
+
+  "contact": {},
+  "license": "MIT",
+
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.findspnr.FindSpnrMod"
+    ]
+  },
+
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.4",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
