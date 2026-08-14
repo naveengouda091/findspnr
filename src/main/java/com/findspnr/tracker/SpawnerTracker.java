@@ -21,11 +21,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * Mode 1: Direct MobSpawnerBlockEntity & BlockState scanner (Singleplayer & Vanilla servers).
  * Mode 2: SeedCracker Dungeon Structure Detector (bypasses Paper/Spigot Anti-Xray Engine Mode 2).
  *
- * Includes automatic 4-block clustering to merge duplicate detections for a single dungeon room!
+ * Feature: Remembers destroyed/mined spawners so once you destroy a dungeon,
+ * it disappears FOREVER and never shows up on your radar again!
  */
 public class SpawnerTracker {
 
     private static final ConcurrentHashMap<BlockPos, SpawnerInfo> detected = new ConcurrentHashMap<>();
+    private static final Set<BlockPos> destroyedSpawners = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private static int tickCounter = 0;
 
     public static void tick(MinecraftClient client) {
@@ -50,12 +52,18 @@ public class SpawnerTracker {
         ChunkPos playerChunk = new ChunkPos(BlockPos.ofFloored(playerPos));
         int radius = ModConfig.scanRadiusChunks;
 
-        // Clean up removed spawners
+        // Clean up destroyed / mined spawners
         detected.entrySet().removeIf(entry -> {
             BlockPos p = entry.getKey();
             if (!world.isChunkLoaded(p.getX() >> 4, p.getZ() >> 4)) return false;
+            
             BlockState state = world.getBlockState(p);
-            return state.isAir(); // Only remove if block was broken
+            // If the block is now air or no longer a spawner/dungeon floor, mark as destroyed!
+            if (state.isAir()) {
+                destroyedSpawners.add(p);
+                return true; // Remove from radar immediately
+            }
+            return false;
         });
 
         // Scan surrounding loaded chunks
@@ -72,8 +80,9 @@ public class SpawnerTracker {
                 for (BlockEntity be : chunk.getBlockEntities().values()) {
                     if (be instanceof MobSpawnerBlockEntity spawnerBe) {
                         BlockPos pos = spawnerBe.getPos();
-                        String entityType = "unknown";
+                        if (destroyedSpawners.contains(pos)) continue;
 
+                        String entityType = "unknown";
                         try {
                             var logic = spawnerBe.getLogic();
                             if (logic != null) {
@@ -87,7 +96,6 @@ public class SpawnerTracker {
                         SpawnerInfo info = new SpawnerInfo(pos, entityType);
                         info.updateDistance(playerPos);
 
-                        // Overwrite any approximate "Dungeon" entry within 4 blocks with exact spawner block pos
                         removeNearbyApproximate(pos);
                         detected.put(pos, info);
                     }
@@ -101,6 +109,8 @@ public class SpawnerTracker {
                     for (int x = 0; x < 16; x++) {
                         for (int z = 0; z < 16; z++) {
                             BlockPos pos = new BlockPos(startX + x, y, startZ + z);
+                            if (destroyedSpawners.contains(pos)) continue;
+
                             BlockState state = world.getBlockState(pos);
 
                             if (state.isOf(Blocks.SPAWNER)) {
@@ -120,12 +130,34 @@ public class SpawnerTracker {
 
     /**
      * SeedCracker Dungeon Structure Detector:
-     * Checks if a mossy cobblestone block belongs to a 5x5 to 7x7 underground dungeon floor.
-     * Prevents duplicate entries for the same dungeon room using a 4-block proximity check.
+     * Checks if a mossy cobblestone block belongs to an underground dungeon floor.
+     * Skips any dungeon location that has been destroyed/mined by the player.
      */
     private static void checkDungeonFloor(ClientWorld world, BlockPos mossyPos, Vec3d playerPos) {
         int y = mossyPos.getY();
         if (y > 128 || y < -64) return;
+
+        BlockPos spawnerPos = new BlockPos(mossyPos.getX(), y + 1, mossyPos.getZ());
+        if (destroyedSpawners.contains(spawnerPos) || destroyedSpawners.contains(mossyPos)) return;
+
+        // If the spawner position itself is already Air, do NOT add as new dungeon!
+        BlockState above = world.getBlockState(spawnerPos);
+        if (above.isAir()) {
+            // Check if there is an actual spawner block nearby
+            boolean hasSpawner = false;
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (world.getBlockState(new BlockPos(mossyPos.getX() + dx, y + 1, mossyPos.getZ() + dz)).isOf(Blocks.SPAWNER)) {
+                        hasSpawner = true;
+                        break;
+                    }
+                }
+            }
+            if (!hasSpawner) {
+                // If spawner is missing/air, do not add fake dungeon entry
+                return;
+            }
+        }
 
         int cobbleCount = 0;
         int mossyCount = 0;
@@ -140,9 +172,6 @@ public class SpawnerTracker {
 
         // Dungeon floor requires 8+ cobblestone/mossy blocks in 5x5 floor area
         if (cobbleCount + mossyCount >= 8 && mossyCount >= 1) {
-            BlockPos spawnerPos = new BlockPos(mossyPos.getX(), y + 1, mossyPos.getZ());
-
-            // Check if ANY spawner is already recorded within 4 blocks (same dungeon room!)
             boolean isDuplicate = false;
             for (BlockPos existing : detected.keySet()) {
                 if (Math.abs(existing.getX() - spawnerPos.getX()) <= 4 &&
@@ -161,9 +190,6 @@ public class SpawnerTracker {
         }
     }
 
-    /**
-     * Removes approximate "Dungeon" entries within 4 blocks when an exact spawner block is found.
-     */
     private static void removeNearbyApproximate(BlockPos exactPos) {
         detected.entrySet().removeIf(entry -> {
             BlockPos p = entry.getKey();
@@ -175,9 +201,6 @@ public class SpawnerTracker {
         });
     }
 
-    /**
-     * Cluster merger: Ensures exactly 1 entry per dungeon room.
-     */
     private static void mergeDuplicates() {
         List<BlockPos> keys = new ArrayList<>(detected.keySet());
         for (int i = 0; i < keys.size(); i++) {
@@ -194,14 +217,12 @@ public class SpawnerTracker {
                     Math.abs(p1.getZ() - p2.getZ()) <= 4 &&
                     Math.abs(p1.getY() - p2.getY()) <= 2) {
 
-                    // Keep the exact "Monster" or real type spawner over generic "Dungeon"
                     if (!info1.getEntityType().equals("Dungeon")) {
                         detected.remove(p2);
                     } else if (!info2.getEntityType().equals("Dungeon")) {
                         detected.remove(p1);
                         break;
                     } else {
-                        // Both are "Dungeon", keep one
                         detected.remove(p2);
                     }
                 }
@@ -217,6 +238,7 @@ public class SpawnerTracker {
 
     public static void clear() {
         detected.clear();
+        destroyedSpawners.clear();
         tickCounter = 0;
     }
 }
