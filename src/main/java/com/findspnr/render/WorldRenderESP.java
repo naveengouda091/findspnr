@@ -1,6 +1,5 @@
 package com.findspnr.render;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.findspnr.config.ModConfig;
 import com.findspnr.tracker.SpawnerInfo;
 import com.findspnr.tracker.SpawnerTracker;
@@ -15,8 +14,12 @@ import org.joml.Matrix4f;
 import java.util.List;
 
 /**
- * Draws a glowing red 3-D bounding-box outline around every detected spawner,
- * visible through walls (depth-test disabled) so you can spot them at range.
+ * Draws a glowing red 3-D bounding-box outline around every detected spawner.
+ *
+ * Updated for Minecraft 26.2 "Chaos Cubed":
+ *  - Uses VertexConsumerProvider / VertexConsumer instead of raw RenderSystem calls
+ *    to stay compatible with both the legacy OpenGL and experimental Vulkan backends.
+ *  - Lines are drawn via RenderLayer.LINES which Blaze3D abstracts over the backend.
  */
 public class WorldRenderESP {
 
@@ -29,76 +32,80 @@ public class WorldRenderESP {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null) return;
 
-        Vec3d        camera  = ctx.camera().getPos();
-        MatrixStack  mstack  = ctx.matrixStack();
+        Vec3d       camera  = ctx.camera().getPos();
+        MatrixStack mstack  = ctx.matrixStack();
+
+        // Use the immediate VertexConsumerProvider from the render context
+        VertexConsumerProvider.Immediate immediate = mc.getBufferBuilders().getEntityVertexConsumers();
+        VertexConsumer lines = immediate.getBuffer(RenderLayer.getLines());
 
         mstack.push();
         mstack.translate(-camera.x, -camera.y, -camera.z);
-
-        RenderSystem.disableDepthTest();
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
-
-        Tessellator   tess   = Tessellator.getInstance();
-        BufferBuilder buf    = tess.begin(VertexFormat.DrawMode.LINES, VertexFormats.POSITION_COLOR);
-        Matrix4f      matrix = mstack.peek().getPositionMatrix();
+        Matrix4f matrix = mstack.peek().getPositionMatrix();
+        Matrix4f normalMatrix = new Matrix4f(mstack.peek().getNormalMatrix());
 
         for (SpawnerInfo spawner : spawners) {
             BlockPos p = spawner.getPos();
 
-            // Outer box – semi-transparent bright red outline
-            drawBox(buf, matrix,
-                    p.getX(),       p.getY(),       p.getZ(),
-                    p.getX() + 1f,  p.getY() + 1f,  p.getZ() + 1f,
+            // Outer box – semi-transparent bright red
+            drawBox(lines, matrix, normalMatrix,
+                    p.getX(),      p.getY(),      p.getZ(),
+                    p.getX() + 1f, p.getY() + 1f, p.getZ() + 1f,
                     1.0f, 0.1f, 0.1f, 0.85f);
 
-            // Inner "core" box – solid red 0.15-block dot in the centre
+            // Inner core dot at the centre
             float s  = 0.15f;
             float bx = p.getX() + 0.5f;
             float by = p.getY() + 0.5f;
             float bz = p.getZ() + 0.5f;
-            drawBox(buf, matrix,
+            drawBox(lines, matrix, normalMatrix,
                     bx - s, by - s, bz - s,
                     bx + s, by + s, bz + s,
                     1.0f, 0.0f, 0.0f, 1.0f);
         }
 
-        BufferRenderer.drawWithGlobalProgram(buf.end());
-
-        RenderSystem.enableDepthTest();
-        RenderSystem.disableBlend();
+        immediate.draw(RenderLayer.getLines());
         mstack.pop();
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private static void drawBox(BufferBuilder buf, Matrix4f m,
-                                float x1, float y1, float z1,
-                                float x2, float y2, float z2,
-                                float r, float g, float b, float a) {
+    private static void drawBox(VertexConsumer vc, Matrix4f m, Matrix4f nm,
+                                 float x1, float y1, float z1,
+                                 float x2, float y2, float z2,
+                                 float r, float g, float b, float a) {
         // Bottom face
-        line(buf, m, x1, y1, z1, x2, y1, z1, r, g, b, a);
-        line(buf, m, x2, y1, z1, x2, y1, z2, r, g, b, a);
-        line(buf, m, x2, y1, z2, x1, y1, z2, r, g, b, a);
-        line(buf, m, x1, y1, z2, x1, y1, z1, r, g, b, a);
+        line(vc, m, nm, x1, y1, z1, x2, y1, z1, r, g, b, a);
+        line(vc, m, nm, x2, y1, z1, x2, y1, z2, r, g, b, a);
+        line(vc, m, nm, x2, y1, z2, x1, y1, z2, r, g, b, a);
+        line(vc, m, nm, x1, y1, z2, x1, y1, z1, r, g, b, a);
         // Top face
-        line(buf, m, x1, y2, z1, x2, y2, z1, r, g, b, a);
-        line(buf, m, x2, y2, z1, x2, y2, z2, r, g, b, a);
-        line(buf, m, x2, y2, z2, x1, y2, z2, r, g, b, a);
-        line(buf, m, x1, y2, z2, x1, y2, z1, r, g, b, a);
+        line(vc, m, nm, x1, y2, z1, x2, y2, z1, r, g, b, a);
+        line(vc, m, nm, x2, y2, z1, x2, y2, z2, r, g, b, a);
+        line(vc, m, nm, x2, y2, z2, x1, y2, z2, r, g, b, a);
+        line(vc, m, nm, x1, y2, z2, x1, y2, z1, r, g, b, a);
         // Vertical pillars
-        line(buf, m, x1, y1, z1, x1, y2, z1, r, g, b, a);
-        line(buf, m, x2, y1, z1, x2, y2, z1, r, g, b, a);
-        line(buf, m, x2, y1, z2, x2, y2, z2, r, g, b, a);
-        line(buf, m, x1, y1, z2, x1, y2, z2, r, g, b, a);
+        line(vc, m, nm, x1, y1, z1, x1, y2, z1, r, g, b, a);
+        line(vc, m, nm, x2, y1, z1, x2, y2, z1, r, g, b, a);
+        line(vc, m, nm, x2, y1, z2, x2, y2, z2, r, g, b, a);
+        line(vc, m, nm, x1, y1, z2, x1, y2, z2, r, g, b, a);
     }
 
-    private static void line(BufferBuilder buf, Matrix4f m,
-                              float x1, float y1, float z1,
-                              float x2, float y2, float z2,
-                              float r, float g, float b, float a) {
-        buf.vertex(m, x1, y1, z1).color(r, g, b, a);
-        buf.vertex(m, x2, y2, z2).color(r, g, b, a);
+    /**
+     * Emits a single line segment using the modern VertexConsumer API.
+     * Each vertex carries position + color + a flat normal (required by RenderLayer.LINES).
+     */
+    private static void line(VertexConsumer vc, Matrix4f m, Matrix4f nm,
+                               float x1, float y1, float z1,
+                               float x2, float y2, float z2,
+                               float r, float g, float b, float a) {
+        // Direction vector for the normal (unit vector along the segment)
+        float dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
+        float len = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len == 0) return;
+        float nx = dx / len, ny = dy / len, nz = dz / len;
+
+        vc.vertex(m, x1, y1, z1).color(r, g, b, a).normal(nm, nx, ny, nz);
+        vc.vertex(m, x2, y2, z2).color(r, g, b, a).normal(nm, nx, ny, nz);
     }
 }
