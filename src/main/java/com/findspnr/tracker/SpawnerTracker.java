@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Dual-Mode Spawner & Dungeon Tracker:
  *
  * Mode 1: Direct MobSpawnerBlockEntity & BlockState scanner (for Singleplayer & Vanilla servers).
- * Mode 2: SeedCracker Dungeon Structure Detector (scans for underground Mossy Cobblestone +
+ * Mode 2: SeedCracker Dungeon Structure Detector (scans Y=-64..128 for Mossy Cobblestone +
  *         Cobblestone floor patterns — bypasses Paper/Spigot Anti-Xray Engine Mode 2!).
  */
 public class SpawnerTracker {
@@ -92,7 +92,8 @@ public class SpawnerTracker {
                 int startX = chunk.getPos().getStartX();
                 int startZ = chunk.getPos().getStartZ();
 
-                for (int y = -59; y <= 50; y++) {
+                // Scan Y from -64 to 128 covering all cave & mountain dungeon heights
+                for (int y = -64; y <= 128; y++) {
                     for (int x = 0; x < 16; x++) {
                         for (int z = 0; z < 16; z++) {
                             BlockPos pos = new BlockPos(startX + x, y, startZ + z);
@@ -114,13 +115,13 @@ public class SpawnerTracker {
 
     /**
      * SeedCracker Dungeon Structure Detector:
-     * Checks if a mossy cobblestone block belongs to a 5x5 to 7x7 underground dungeon floor.
+     * Checks if a mossy cobblestone block belongs to an underground dungeon floor.
      * Paper/Spigot Anti-Xray servers hide the spawner block itself, but NEVER hide cobblestone
      * or mossy cobblestone!
      */
     private static void checkDungeonFloor(ClientWorld world, BlockPos mossyPos, Vec3d playerPos) {
         int y = mossyPos.getY();
-        if (y > 50 || y < -59) return;
+        if (y > 128 || y < -64) return;
 
         int cobbleCount = 0;
         int mossyCount = 0;
@@ -133,16 +134,13 @@ public class SpawnerTracker {
             }
         }
 
-        // Dungeon floor: 5x5 area has at least 14 cobblestone/mossy blocks and at least 2 mossy
-        if (cobbleCount + mossyCount >= 14 && mossyCount >= 2) {
-            BlockState above = world.getBlockState(new BlockPos(mossyPos.getX(), y + 1, mossyPos.getZ()));
-            if (above.isAir() || above.isOf(Blocks.SPAWNER) || above.isOf(Blocks.WATER) || above.isOf(Blocks.CHEST)) {
-                BlockPos spawnerPos = new BlockPos(mossyPos.getX(), y + 1, mossyPos.getZ());
-                if (!detected.containsKey(spawnerPos)) {
-                    SpawnerInfo info = new SpawnerInfo(spawnerPos, "Dungeon");
-                    info.updateDistance(playerPos);
-                    detected.put(spawnerPos, info);
-                }
+        // Dungeon floor: 5x5 area has at least 8 cobblestone/mossy blocks and at least 1 mossy
+        if (cobbleCount + mossyCount >= 8 && mossyCount >= 1) {
+            BlockPos spawnerPos = new BlockPos(mossyPos.getX(), y + 1, mossyPos.getZ());
+            if (!detected.containsKey(spawnerPos)) {
+                SpawnerInfo info = new SpawnerInfo(spawnerPos, "Dungeon");
+                info.updateDistance(playerPos);
+                detected.put(spawnerPos, info);
             }
         }
     }

@@ -66,7 +66,7 @@ public class FindSpnrMod implements ClientModInitializer {
         });
 
         // ── 3. Render hooks ────────────────────────────────────────────────────
-        WorldRenderEvents.AFTER_TRANSLUCENT.register(WorldRenderESP::render);
+        WorldRenderEvents.LAST.register(WorldRenderESP::render);
         HudRenderCallback.EVENT.register(HUDRadarRenderer::render);
 
         // ── 4. Clear cache on disconnect ───────────────────────────────────────

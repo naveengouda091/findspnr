@@ -6,23 +6,30 @@ import com.findspnr.tracker.SpawnerInfo;
 import com.findspnr.tracker.SpawnerTracker;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.gl.ShaderProgram;
+import net.minecraft.client.render.BufferBuilder;
+import net.minecraft.client.render.BufferRenderer;
+import net.minecraft.client.render.GameRenderer;
+import net.minecraft.client.render.Tessellator;
+import net.minecraft.client.render.VertexFormat;
+import net.minecraft.client.render.VertexFormats;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
 
+import java.lang.reflect.Method;
 import java.util.List;
 
 /**
  * 3D World ESP Renderer:
  * Renders glowing red bounding box outlines around spawner blocks.
- * Uses RenderSystem.disableDepthTest() + immediate.draw() so the red outlines are
- * 100% visible THROUGH WALLS!
+ * Uses Tessellator + RenderSystem.disableDepthTest() so lines render 100% THROUGH WALLS.
  */
 public class WorldRenderESP {
+
+    private static Method shaderMethod = null;
+    private static boolean reflectionAttempted = false;
 
     public static void render(WorldRenderContext context) {
         if (!ModConfig.enabled || !ModConfig.renderWorldESP) {
@@ -43,42 +50,64 @@ public class WorldRenderESP {
         matrices.push();
         matrices.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
-        if (context.consumers() != null) {
-            // Disable depth test & depth mask so lines render THROUGH WALLS
-            RenderSystem.disableDepthTest();
-            RenderSystem.depthMask(false);
+        RenderSystem.disableDepthTest();
+        RenderSystem.depthMask(false);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
 
-            VertexConsumer consumer = context.consumers().getBuffer(RenderLayer.getLines());
-            Matrix4f matrix = matrices.peek().getPositionMatrix();
+        setLineShader();
 
-            for (SpawnerInfo spawner : spawners) {
-                BlockPos pos = spawner.getPos();
-                
-                // Outer 1x1x1 block outline (Bright Red)
-                drawBoxOutline(consumer, matrix, pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1, 1.0f, 0.0f, 0.0f, 1.0f);
-                
-                // Inner center core box (Bright Red)
-                double cx = pos.getX() + 0.5;
-                double cy = pos.getY() + 0.5;
-                double cz = pos.getZ() + 0.5;
-                double s = 0.15;
-                drawBoxOutline(consumer, matrix, cx - s, cy - s, cz - s, cx + s, cy + s, cz + s, 1.0f, 0.2f, 0.2f, 1.0f);
-            }
+        Tessellator tessellator = Tessellator.getInstance();
+        BufferBuilder bufferBuilder = tessellator.begin(VertexFormat.DrawMode.LINES, VertexFormats.LINES);
+        Matrix4f matrix = matrices.peek().getPositionMatrix();
 
-            // Immediately flush lines layer while depth test is disabled
-            if (context.consumers() instanceof VertexConsumerProvider.Immediate immediate) {
-                immediate.draw(RenderLayer.getLines());
-            }
-
-            // Re-enable depth test
-            RenderSystem.depthMask(true);
-            RenderSystem.enableDepthTest();
+        for (SpawnerInfo spawner : spawners) {
+            BlockPos pos = spawner.getPos();
+            
+            // Outer 1x1x1 spawner box outline (Bright Red)
+            drawBoxOutline(bufferBuilder, matrix, pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1, 1.0f, 0.0f, 0.0f, 1.0f);
+            
+            // Inner core box outline (Bright Red)
+            double cx = pos.getX() + 0.5;
+            double cy = pos.getY() + 0.5;
+            double cz = pos.getZ() + 0.5;
+            double s = 0.15;
+            drawBoxOutline(bufferBuilder, matrix, cx - s, cy - s, cz - s, cx + s, cy + s, cz + s, 1.0f, 0.3f, 0.3f, 1.0f);
         }
 
+        BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
+
+        RenderSystem.depthMask(true);
+        RenderSystem.enableDepthTest();
+        RenderSystem.disableBlend();
         matrices.pop();
     }
 
-    private static void drawBoxOutline(VertexConsumer consumer, Matrix4f matrix, double minX, double minY, double minZ, double maxX, double maxY, double maxZ, float r, float g, float b, float a) {
+    private static void setLineShader() {
+        if (!reflectionAttempted) {
+            reflectionAttempted = true;
+            for (Method m : GameRenderer.class.getDeclaredMethods()) {
+                if (m.getParameterCount() == 0 && ShaderProgram.class.isAssignableFrom(m.getReturnType())) {
+                    String name = m.getName().toLowerCase();
+                    if (name.contains("line") || name.contains("positioncolor")) {
+                        shaderMethod = m;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (shaderMethod != null) {
+            try {
+                ShaderProgram program = (ShaderProgram) shaderMethod.invoke(null);
+                if (program != null) {
+                    RenderSystem.setShader(program);
+                }
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private static void drawBoxOutline(BufferBuilder builder, Matrix4f matrix, double minX, double minY, double minZ, double maxX, double maxY, double maxZ, float r, float g, float b, float a) {
         float x1 = (float) minX;
         float y1 = (float) minY;
         float z1 = (float) minZ;
@@ -87,25 +116,25 @@ public class WorldRenderESP {
         float z2 = (float) maxZ;
 
         // Bottom square
-        line(consumer, matrix, x1, y1, z1, x2, y1, z1, r, g, b, a);
-        line(consumer, matrix, x2, y1, z1, x2, y1, z2, r, g, b, a);
-        line(consumer, matrix, x2, y1, z2, x1, y1, z2, r, g, b, a);
-        line(consumer, matrix, x1, y1, z2, x1, y1, z1, r, g, b, a);
+        line(builder, matrix, x1, y1, z1, x2, y1, z1, r, g, b, a);
+        line(builder, matrix, x2, y1, z1, x2, y1, z2, r, g, b, a);
+        line(builder, matrix, x2, y1, z2, x1, y1, z2, r, g, b, a);
+        line(builder, matrix, x1, y1, z2, x1, y1, z1, r, g, b, a);
 
         // Top square
-        line(consumer, matrix, x1, y2, z1, x2, y2, z1, r, g, b, a);
-        line(consumer, matrix, x2, y2, z1, x2, y2, z2, r, g, b, a);
-        line(consumer, matrix, x2, y2, z2, x1, y2, z2, r, g, b, a);
-        line(consumer, matrix, x1, y2, z2, x1, y2, z1, r, g, b, a);
+        line(builder, matrix, x1, y2, z1, x2, y2, z1, r, g, b, a);
+        line(builder, matrix, x2, y2, z1, x2, y2, z2, r, g, b, a);
+        line(builder, matrix, x2, y2, z2, x1, y2, z2, r, g, b, a);
+        line(builder, matrix, x1, y2, z2, x1, y2, z1, r, g, b, a);
 
         // Vertical pillars
-        line(consumer, matrix, x1, y1, z1, x1, y2, z1, r, g, b, a);
-        line(consumer, matrix, x2, y1, z1, x2, y2, z1, r, g, b, a);
-        line(consumer, matrix, x2, y1, z2, x2, y2, z2, r, g, b, a);
-        line(consumer, matrix, x1, y1, z2, x1, y2, z2, r, g, b, a);
+        line(builder, matrix, x1, y1, z1, x1, y2, z1, r, g, b, a);
+        line(builder, matrix, x2, y1, z1, x2, y2, z1, r, g, b, a);
+        line(builder, matrix, x2, y1, z2, x2, y2, z2, r, g, b, a);
+        line(builder, matrix, x1, y1, z2, x1, y2, z2, r, g, b, a);
     }
 
-    private static void line(VertexConsumer consumer, Matrix4f matrix, float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a) {
+    private static void line(BufferBuilder builder, Matrix4f matrix, float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a) {
         float dx = x2 - x1;
         float dy = y2 - y1;
         float dz = z2 - z1;
@@ -114,7 +143,7 @@ public class WorldRenderESP {
         float ny = len > 0 ? dy / len : 1f;
         float nz = len > 0 ? dz / len : 0f;
 
-        consumer.vertex(matrix, x1, y1, z1).color(r, g, b, a).normal(nx, ny, nz);
-        consumer.vertex(matrix, x2, y2, z2).color(r, g, b, a).normal(nx, ny, nz);
+        builder.vertex(matrix, x1, y1, z1).color(r, g, b, a).normal(nx, ny, nz);
+        builder.vertex(matrix, x2, y2, z2).color(r, g, b, a).normal(nx, ny, nz);
     }
 }
