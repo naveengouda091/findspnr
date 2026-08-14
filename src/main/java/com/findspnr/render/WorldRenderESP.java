@@ -1,5 +1,6 @@
 package com.findspnr.render;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.findspnr.config.ModConfig;
 import com.findspnr.tracker.SpawnerInfo;
 import com.findspnr.tracker.SpawnerTracker;
@@ -7,6 +8,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
@@ -14,6 +16,12 @@ import org.joml.Matrix4f;
 
 import java.util.List;
 
+/**
+ * 3D World ESP Renderer:
+ * Renders glowing red bounding box outlines around spawner blocks.
+ * Uses RenderSystem.disableDepthTest() + immediate.draw() so the red outlines are
+ * 100% visible THROUGH WALLS!
+ */
 public class WorldRenderESP {
 
     public static void render(WorldRenderContext context) {
@@ -36,20 +44,35 @@ public class WorldRenderESP {
         matrices.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
         if (context.consumers() != null) {
+            // Disable depth test & depth mask so lines render THROUGH WALLS
+            RenderSystem.disableDepthTest();
+            RenderSystem.depthMask(false);
+
             VertexConsumer consumer = context.consumers().getBuffer(RenderLayer.getLines());
             Matrix4f matrix = matrices.peek().getPositionMatrix();
 
             for (SpawnerInfo spawner : spawners) {
                 BlockPos pos = spawner.getPos();
-                drawBoxOutline(consumer, matrix, pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1, 1.0f, 0.1f, 0.1f, 0.9f);
                 
-                // Draw inner red center dot box
+                // Outer 1x1x1 block outline (Bright Red)
+                drawBoxOutline(consumer, matrix, pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1, 1.0f, 0.0f, 0.0f, 1.0f);
+                
+                // Inner center core box (Bright Red)
                 double cx = pos.getX() + 0.5;
                 double cy = pos.getY() + 0.5;
                 double cz = pos.getZ() + 0.5;
                 double s = 0.15;
-                drawBoxOutline(consumer, matrix, cx - s, cy - s, cz - s, cx + s, cy + s, cz + s, 1.0f, 0.0f, 0.0f, 1.0f);
+                drawBoxOutline(consumer, matrix, cx - s, cy - s, cz - s, cx + s, cy + s, cz + s, 1.0f, 0.2f, 0.2f, 1.0f);
             }
+
+            // Immediately flush lines layer while depth test is disabled
+            if (context.consumers() instanceof VertexConsumerProvider.Immediate immediate) {
+                immediate.draw(RenderLayer.getLines());
+            }
+
+            // Re-enable depth test
+            RenderSystem.depthMask(true);
+            RenderSystem.enableDepthTest();
         }
 
         matrices.pop();
