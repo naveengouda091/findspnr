@@ -24,7 +24,7 @@ import java.util.List;
 /**
  * FindSpnr – Dungeon Radar
  *
- * Client-only Fabric mod for Minecraft 1.21.4.
+ * Client-only Fabric mod for Minecraft 26.2 "Chaos Cubed".
  * Scans loaded chunks for monster spawners (dungeons) and renders:
  *   • A HUD radar with red dots (top-right)
  *   • 3-D glowing outlines in the world (through walls)
