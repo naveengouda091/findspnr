@@ -19,10 +19,11 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Super-Optimized Dual-Mode Spawner & Dungeon Tracker:
  *
- * Performance fixes:
- * 1. Fast ChunkSection palette filtering: skips 99% of empty/stone sections instantly.
- * 2. Mutable BlockPos reuse: zero garbage collection object allocations (fixes screen freezing).
- * 3. Staggered chunk scanning: spreads chunk scans smoothly over time.
+ * Mode 1: Direct MobSpawnerBlockEntity & BlockState scanner (Singleplayer & Vanilla servers).
+ * Mode 2: SeedCracker Dungeon Structure Detector (bypasses Paper/Spigot Anti-Xray Engine Mode 2).
+ *
+ * Feature 1: Remembers destroyed/mined spawners.
+ * Feature 2: Auto-removes dungeons from the list/radar as soon as you walk within 3.5 blocks of them!
  */
 public class SpawnerTracker {
 
@@ -35,17 +36,25 @@ public class SpawnerTracker {
 
         tickCounter++;
 
-        // Full scan every 20 ticks (~1s) to eliminate micro-stutters
+        // Full scan every 20 ticks (~1s)
         if (tickCounter % 20 == 0) {
             scanChunks(client.world, client.player.getPos());
             mergeDuplicates();
         }
 
-        // Update distances every tick for smooth radar rendering
+        // Update distances every tick & auto-delete dungeons when player reaches them (<= 3.5m)
         Vec3d playerPos = client.player.getPos();
-        for (SpawnerInfo info : detected.values()) {
+        detected.entrySet().removeIf(entry -> {
+            SpawnerInfo info = entry.getValue();
             info.updateDistance(playerPos);
-        }
+
+            // Auto-delete from list/radar when player arrives at the dungeon (distance <= 3.5 blocks)
+            if (info.getDistance() <= 3.5) {
+                destroyedSpawners.add(entry.getKey());
+                return true; // Removes immediately from HUD list, radar & 3D tracer!
+            }
+            return false;
+        });
     }
 
     private static void scanChunks(ClientWorld world, Vec3d playerPos) {
