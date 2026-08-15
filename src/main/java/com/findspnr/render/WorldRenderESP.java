@@ -1,5 +1,6 @@
 package com.findspnr.render;
 
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.findspnr.config.ModConfig;
 import com.findspnr.tracker.SpawnerInfo;
@@ -23,9 +24,10 @@ import java.util.List;
 
 /**
  * 3D World ESP & Tracer Lines Renderer:
- *  1. Renders a thin red tracer thread connecting player camera directly to each spawner.
+ *  1. Renders a thin red tracer thread connecting player crosshair directly to each spawner.
  *  2. Renders a bright red 3D bounding box outline around each spawner block.
- *  3. Uses RenderSystem.disableDepthTest() so lines & tracers render 100% THROUGH WALLS.
+ *  3. Uses direct GlStateManager._disableDepthTest() right before drawWithGlobalProgram
+ *     so lines & tracers render 100% THROUGH ALL BLOCKS (Stone, Dirt, Ice, Bedrock)!
  */
 public class WorldRenderESP {
 
@@ -50,11 +52,11 @@ public class WorldRenderESP {
 
         matrices.push();
 
-        // Disable depth test so tracers & boxes render see-through through all blocks
-        RenderSystem.disableDepthTest();
-        RenderSystem.depthMask(false);
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
+        // Direct low-level OpenGL state overrides to force see-through lines everywhere
+        GlStateManager._disableDepthTest();
+        GlStateManager._depthMask(false);
+        GlStateManager._enableBlend();
+        GlStateManager._blendFunc(GlStateManager.SrcFactor.SRC_ALPHA.value, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA.value);
 
         setLineShader();
 
@@ -70,8 +72,8 @@ public class WorldRenderESP {
             double targetY = pos.getY() + 0.5 - cameraPos.y;
             double targetZ = pos.getZ() + 0.5 - cameraPos.z;
 
-            // 1. Tracer line (thin red thread from camera center (0,0,0) to spawner center)
-            line(bufferBuilder, matrix, 0f, -0.1f, 0f, (float) targetX, (float) targetY, (float) targetZ, 1.0f, 0.0f, 0.0f, 1.0f);
+            // 1. Tracer line (thin red thread from crosshair center (0,0,0) to spawner center)
+            line(bufferBuilder, matrix, 0f, 0f, 0f, (float) targetX, (float) targetY, (float) targetZ, 1.0f, 0.0f, 0.0f, 1.0f);
 
             // 2. Outer 1x1x1 spawner box outline (Bright Red)
             drawBoxOutline(bufferBuilder, matrix, targetX - 0.5, targetY - 0.5, targetZ - 0.5,
@@ -83,11 +85,15 @@ public class WorldRenderESP {
                            targetX + s, targetY + s, targetZ + s, 1.0f, 0.8f, 0.0f, 1.0f);
         }
 
+        // FORCE OpenGL depth test disabled RIGHT BEFORE actual GPU draw call
+        GlStateManager._disableDepthTest();
+        GlStateManager._depthMask(false);
+
         BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
 
-        RenderSystem.depthMask(true);
-        RenderSystem.enableDepthTest();
-        RenderSystem.disableBlend();
+        // Restore OpenGL depth state
+        GlStateManager._depthMask(true);
+        GlStateManager._enableDepthTest();
         matrices.pop();
     }
 

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CraftVault – Premium Minecraft Modpacks & Tactical Client Utilities</title>
+    <meta name="description" content="Dominate Minecraft with CraftVault's ultra-optimized Fabric modpacks. Featuring 3D ESP Trackers, Fixed Radar Minimaps, Anti-Xray Dungeon Scanners, and 240+ FPS Engines.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- Dynamic Background Grid & Lights -->
+    <div class="bg-lights">
+        <div class="light-blob blob-1"></div>
+        <div class="light-blob blob-2"></div>
+        <div class="light-blob blob-3"></div>
+    </div>
+    <div class="grid-overlay"></div>
+
+    <!-- Navigation Header -->
+    <header class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="#" class="brand-logo">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">Craft<span>Vault</span></div>
+            </a>
+            <nav class="nav-links">
+                <a href="#modpacks" class="nav-link active">Modpacks</a>
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#preview" class="nav-link">Live Demo</a>
+                <a href="#faq" class="nav-link">FAQ</a>
+            </nav>
+            <div class="nav-actions">
+                <button class="cart-btn" id="cartToggleBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+                    <span>Cart</span>
+                    <div class="cart-badge" id="cartBadge">0</div>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="hero-container">
+            <div class="hero-tag">
+                <span class="tag-pulse"></span>
+                <span>COMPATIBLE WITH MINECRAFT 1.21.4 & FABRIC 0.19+</span>
+            </div>
+            <h1 class="hero-title">Dominate Every Server With <span class="gradient-text">Next-Gen Modpacks</span></h1>
+            <p class="hero-subtitle">
+                Ultra-optimized utility suites featuring 3D See-Through ESP, Fixed North-Up Radar, Anti-Xray Dungeon Trackers, and 240+ FPS boost engines.
+            </p>
+            <div class="hero-cta-group">
+                <a href="#modpacks" class="btn btn-primary btn-glow">
+                    <span>Explore Modpacks</span>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </a>
+                <button class="btn btn-secondary" id="openPreviewHeroBtn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <span>Interactive HUD Preview</span>
+                </button>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="stat-card">
+                    <div class="stat-num">240+</div>
+                    <div class="stat-label">FPS Performance Boost</div>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-card">
+                    <div class="stat-num">18.4K</div>
+                    <div class="stat-label">Active Players</div>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-card">
+                    <div class="stat-num">0.001ms</div>
+                    <div class="stat-label">Zero-Lag Palette Filter</div>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-card">
+                    <div class="stat-num">4.9 ★</div>
+                    <div class="stat-label">Customer Rating</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Modpacks Store Catalog -->
+    <section class="store-section" id="modpacks">
+        <div class="section-header">
+            <div class="section-badge">PREMIUM BUNDLES</div>
+            <h2 class="section-title">Select Your Modpack Suite</h2>
+            <p class="section-subtitle">Instant digital download • Lifetime updates • Single-click Fabric installer included</p>
+        </div>
+
+        <!-- Filter Tabs & Search -->
+        <div class="catalog-toolbar">
+            <div class="filter-tabs">
+                <button class="tab-btn active" data-filter="all">All Packs</button>
+                <button class="tab-btn" data-filter="radar">Tactical & ESP</button>
+                <button class="tab-btn" data-filter="pvp">PvP & Utility</button>
+                <button class="tab-btn" data-filter="fps">FPS & Shaders</button>
+            </div>
+            <div class="search-box">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="searchInput" placeholder="Search modpacks or features...">
+            </div>
+        </div>
+
+        <!-- Modpack Cards Grid -->
+        <div class="modpack-grid" id="modpackGrid">
+            <!-- Cards populated dynamically via JS -->
+        </div>
+    </section>
+
+    <!-- Features Highlight Section -->
+    <section class="features-section" id="features">
+        <div class="section-header">
+            <div class="section-badge">ENGINEERING EXCELLENCE</div>
+            <h2 class="section-title">Built For Peak Server Performance</h2>
+            <p class="section-subtitle">Designed from first principles to give you maximum clarity without performance lag.</p>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card glass">
+                <div class="feature-icon icon-red">🎯</div>
+                <h3>Fixed North-Up Radar</h3>
+                <p>Tactical Free Fire style minimap layout. Keeps North locked at the top so turning around never disorients your navigation.</p>
+            </div>
+            <div class="feature-card glass">
+                <div class="feature-icon icon-cyan">🌐</div>
+                <h3>3D See-Through ESP & Tracers</h3>
+                <p>Glowing red bounding boxes and crisp tracer threads connect directly from your crosshair to dungeon spawners through walls.</p>
+            </div>
+            <div class="feature-card glass">
+                <div class="feature-icon icon-gold">🛡️</div>
+                <h3>Anti-Xray Dungeon Scanner</h3>
+                <p>Scans underground mossy cobblestone room patterns. Bypasses Paper & Spigot Anti-Xray Engine Mode 2 instantly.</p>
+            </div>
+            <div class="feature-card glass">
+                <div class="feature-icon icon-green">⚡</div>
+                <h3>Zero-GC Lag Filter</h3>
+                <p>Custom ChunkSection palette filtering skips empty sections in 0.001ms, eliminating stutter and screen freezes completely.</p>
+            </div>
+            <div class="feature-card glass">
+                <div class="feature-icon icon-purple">📍</div>
+                <h3>Middle-Top Coords Bar</h3>
+                <p>Clean high-contrast XYZ HUD bar centered at the top of your screen so you always know your exact location.</p>
+            </div>
+            <div class="feature-card glass">
+                <div class="feature-icon icon-orange">🧹</div>
+                <h3>Auto Dungeon Deduplication</h3>
+                <p>Smart 4-block spatial clustering merges multiple floor pattern hits into exactly ONE spawner entry per room.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Interactive HUD Demo Preview Modal -->
+    <div class="modal-backdrop" id="previewModal">
+        <div class="modal-box preview-box glass">
+            <div class="modal-header">
+                <h3>🎮 Live Modpack HUD Simulator</h3>
+                <button class="modal-close" id="closePreviewBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="hud-simulator-container">
+                    <!-- Simulated Game View -->
+                    <div class="game-viewport" id="gameViewport">
+                        <!-- Top-Left Text List -->
+                        <div class="sim-hud-left">
+                            <div class="sim-title">[FindSpnr] Detected: <span id="simCount">2</span></div>
+                            <div class="sim-item">• Zombie Spawner (14.2m) [X:-84 Y:32 Z:-210]</div>
+                            <div class="sim-item">• Skeleton Dungeon (28.6m) [X:-110 Y:18 Z:-195]</div>
+                        </div>
+
+                        <!-- Top-Middle Coords Bar -->
+                        <div class="sim-hud-middle">
+                            XYZ: <span class="coord-val">-89</span> / <span class="coord-val">72</span> / <span class="coord-val">-224</span>
+                        </div>
+
+                        <!-- Top-Right Radar -->
+                        <div class="sim-hud-radar" id="simRadar">
+                            <div class="radar-compass comp-n">N</div>
+                            <div class="radar-compass comp-s">S</div>
+                            <div class="radar-compass comp-w">W</div>
+                            <div class="radar-compass comp-e">E</div>
+                            <div class="radar-crosshair-v"></div>
+                            <div class="radar-crosshair-h"></div>
+                            <div class="sim-player-arrow" id="simPlayerArrow">▲</div>
+                            <div class="sim-radar-dot dot-1"></div>
+                            <div class="sim-radar-dot dot-2"></div>
+                        </div>
+
+                        <!-- Simulated 3D World ESP Box & Tracer -->
+                        <div class="sim-3d-esp" id="sim3dEsp">
+                            <div class="tracer-thread"></div>
+                            <div class="esp-box">
+                                <div class="esp-label">Zombie Spawner [14.2m]</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Simulator Controls -->
+                    <div class="hud-controls">
+                        <h4>Interactive Controls</h4>
+                        <div class="control-row">
+                            <label>Radar Display:</label>
+                            <button class="btn-toggle active" id="toggleRadarSim">ON</button>
+                        </div>
+                        <div class="control-row">
+                            <label>3D See-Through ESP:</label>
+                            <button class="btn-toggle active" id="toggleEspSim">ON</button>
+                        </div>
+                        <div class="control-row">
+                            <label>Tracer Threads:</label>
+                            <button class="btn-toggle active" id="toggleTracerSim">ON</button>
+                        </div>
+                        <div class="control-row">
+                            <label>Rotate Player Heading:</label>
+                            <input type="range" min="0" max="360" value="45" id="yawRange">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide-Out Shopping Cart Sidebar -->
+    <div class="cart-overlay" id="cartOverlay"></div>
+    <aside class="cart-sidebar" id="cartSidebar">
+        <div class="cart-header">
+            <h3>Your Modpack Order</h3>
+            <button class="close-cart" id="closeCartBtn">&times;</button>
+        </div>
+        <div class="cart-items" id="cartItemsContainer">
+            <!-- Items rendered via JS -->
+        </div>
+        <div class="cart-footer">
+            <div class="promo-box">
+                <input type="text" id="promoInput" placeholder="Promo code (e.g. CRAFT20)">
+                <button id="applyPromoBtn">Apply</button>
+            </div>
+            <div class="summary-line">
+                <span>Subtotal:</span>
+                <span id="subtotalPrice">$0.00</span>
+            </div>
+            <div class="summary-line discount-line hidden" id="discountRow">
+                <span>Discount (20% OFF):</span>
+                <span id="discountPrice">-$0.00</span>
+            </div>
+            <div class="summary-line total-line">
+                <span>Total Amount:</span>
+                <span id="totalPrice">$0.00</span>
+            </div>
+            <button class="btn btn-primary btn-full btn-glow" id="checkoutBtn">
+                <span>Complete Purchase & Instant Download</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- FAQ Section -->
+    <section class="faq-section" id="faq">
+        <div class="section-header">
+            <div class="section-badge">FREQUENTLY ASKED QUESTIONS</div>
+            <h2 class="section-title">Everything You Need To Know</h2>
+        </div>
+        <div class="faq-container">
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>What Minecraft versions are supported?</span>
+                    <div class="faq-icon">+</div>
+                </div>
+                <div class="faq-answer">
+                    <p>All modpacks are fully updated for <strong>Minecraft 1.21.4</strong> and Fabric Loader 0.16.0+. Automatic updates are provided free for life!</p>
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>Does the Anti-Xray scanner work on Paper & Purpur servers?</span>
+                    <div class="faq-icon">+</div>
+                </div>
+                <div class="faq-answer">
+                    <p>Yes! Our <strong>SeedCracker Dungeon Room Structure Scanner</strong> detects underground Mossy Cobblestone floor signatures, which Paper/Spigot Anti-Xray plugins do not obfuscate.</p>
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>How do I install the modpack after purchasing?</span>
+                    <div class="faq-icon">+</div>
+                </div>
+                <div class="faq-answer">
+                    <p>You receive an instant <code>.jar</code> bundle along with an automated installer script. Simply drop the <code>.jar</code> into your <code>.minecraft/mods</code> folder and launch!</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <div class="logo-text">Craft<span>Vault</span></div>
+                <p>Next-generation client utility modpacks built for maximum server performance and zero lag.</p>
+            </div>
+            <div class="footer-links">
+                <h4>Quick Links</h4>
+                <a href="#modpacks">Modpacks Store</a>
+                <a href="#features">Features</a>
+                <a href="#preview">Live HUD Demo</a>
+                <a href="#faq">Support & FAQ</a>
+            </div>
+            <div class="footer-legal">
+                <p>© 2026 CraftVault Technologies. Not affiliated with Mojang Studios or Microsoft.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast Notification Popup -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
