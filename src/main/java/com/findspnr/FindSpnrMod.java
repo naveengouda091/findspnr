@@ -5,6 +5,8 @@ import com.findspnr.render.HUDRadarRenderer;
 import com.findspnr.render.WorldRenderESP;
 import com.findspnr.tracker.BaseInfo;
 import com.findspnr.tracker.BaseTracker;
+import com.findspnr.tracker.BastionInfo;
+import com.findspnr.tracker.BastionTracker;
 import com.findspnr.tracker.FreecamController;
 import com.findspnr.tracker.SpawnerInfo;
 import com.findspnr.tracker.SpawnerTracker;
@@ -25,14 +27,14 @@ import org.lwjgl.glfw.GLFW;
 import java.util.List;
 
 /**
- * FindSpnr – Dungeon & Base Radar
+ * FindSpnr – Dungeon, Base & Bastion Radar
  *
  * Client-only Fabric mod for Minecraft.
- * Scans loaded chunks for monster spawners (dungeons) and base treasure (Shulker Boxes & Ender Chests).
+ * Scans loaded chunks for monster spawners, base treasure (Shulker/Ender Chests), and Bastion Remnants.
  *
  * Keybinding   : G  → toggle entire mod
  * Keybinding   : K  → toggle Freecam mode
- * Chat commands: /findspnr toggle | base | freecam | esp | radar | list
+ * Chat commands: /findspnr toggle | base | bastion | freecam | esp | radar | list
  */
 public class FindSpnrMod implements ClientModInitializer {
 
@@ -42,7 +44,7 @@ public class FindSpnrMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        System.out.println("[FindSpnr] Initialising Dungeon, Base Radar & Freecam...");
+        System.out.println("[FindSpnr] Initialising Dungeon, Base & Bastion Radar...");
 
         // ── 1. Key bindings ────────────────────────────────────────────────────
         toggleKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
@@ -61,7 +63,6 @@ public class FindSpnrMod implements ClientModInitializer {
 
         // ── 2. Tick listener ───────────────────────────────────────────────────
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            // Handle master toggle key press (G)
             while (toggleKey.wasPressed()) {
                 ModConfig.enabled = !ModConfig.enabled;
                 if (client.player != null) {
@@ -71,7 +72,6 @@ public class FindSpnrMod implements ClientModInitializer {
                 }
             }
 
-            // Handle Freecam key press (K)
             while (freecamKey.wasPressed()) {
                 FreecamController.toggle(client);
             }
@@ -79,6 +79,7 @@ public class FindSpnrMod implements ClientModInitializer {
             // Run trackers & freecam
             SpawnerTracker.tick(client);
             BaseTracker.tick(client);
+            BastionTracker.tick(client);
             FreecamController.tick(client);
         });
 
@@ -90,6 +91,7 @@ public class FindSpnrMod implements ClientModInitializer {
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             SpawnerTracker.clear();
             BaseTracker.clear();
+            BastionTracker.clear();
             ModConfig.freecamEnabled = false;
         });
 
@@ -107,6 +109,13 @@ public class FindSpnrMod implements ClientModInitializer {
                             ctx.getSource().sendFeedback(Text.literal(
                                     "§c[FindSpnr] §fBase Finder (Shulker Box / Ender Chest) " +
                                             (ModConfig.renderBaseFinder ? "§aENABLED ✔" : "§cDISABLED ✖")));
+                            return 1;
+                        }))
+                        .then(ClientCommandManager.literal("bastion").executes(ctx -> {
+                            ModConfig.renderBastionFinder = !ModConfig.renderBastionFinder;
+                            ctx.getSource().sendFeedback(Text.literal(
+                                    "§c[FindSpnr] §fBastion Finder " +
+                                            (ModConfig.renderBastionFinder ? "§aENABLED ✔" : "§cDISABLED ✖")));
                             return 1;
                         }))
                         .then(ClientCommandManager.literal("freecam").executes(ctx -> {
@@ -132,10 +141,11 @@ public class FindSpnrMod implements ClientModInitializer {
                         .then(ClientCommandManager.literal("list").executes(ctx -> {
                             List<SpawnerInfo> spawners = SpawnerTracker.getDetectedSpawners();
                             List<BaseInfo> bases = BaseTracker.getDetectedBases();
+                            List<BastionInfo> bastions = BastionTracker.getDetectedBastions();
 
-                            if (spawners.isEmpty() && bases.isEmpty()) {
+                            if (spawners.isEmpty() && bases.isEmpty() && bastions.isEmpty()) {
                                 ctx.getSource().sendFeedback(Text.literal(
-                                        "§c[FindSpnr] §7No spawners or base treasure detected in loaded chunks."));
+                                        "§c[FindSpnr] §7No targets detected in loaded chunks."));
                             } else {
                                 if (!spawners.isEmpty()) {
                                     ctx.getSource().sendFeedback(Text.literal(
@@ -159,12 +169,23 @@ public class FindSpnrMod implements ClientModInitializer {
                                                 p.getX(), p.getY(), p.getZ())));
                                     }
                                 }
+                                if (!bastions.isEmpty()) {
+                                    ctx.getSource().sendFeedback(Text.literal(
+                                            "§c[FindSpnr] §6Found §e" + bastions.size() + " §6bastion(s):"));
+                                    for (BastionInfo info : bastions) {
+                                        BlockPos p = info.getPos();
+                                        ctx.getSource().sendFeedback(Text.literal(String.format(
+                                                " §6• %s §7(%.1fm) §8at [%d, %d, %d]",
+                                                info.getType(), info.getDistance(),
+                                                p.getX(), p.getY(), p.getZ())));
+                                    }
+                                }
                             }
                             return 1;
                         }))
                 )
         );
 
-        System.out.println("[FindSpnr] Ready! Press G for mod toggle, K for Freecam.");
+        System.out.println("[FindSpnr] Ready! Press G for toggle, K for Freecam, use /findspnr bastion for Bastions.");
     }
 }

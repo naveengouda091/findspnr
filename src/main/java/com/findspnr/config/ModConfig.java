@@ -18,6 +18,9 @@ public class ModConfig {
     /** Base Finder toggle (/findspnr base) – tracks Shulker Boxes & Ender Chests */
     public static boolean renderBaseFinder = false;
 
+    /** Bastion Finder toggle (/findspnr bastion) – tracks Nether Bastion Remnants */
+    public static boolean renderBastionFinder = false;
+
     /** Freecam toggle (Press K or /findspnr freecam) */
     public static boolean freecamEnabled = false;
 

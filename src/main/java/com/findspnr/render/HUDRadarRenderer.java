@@ -3,6 +3,9 @@ package com.findspnr.render;
 import com.findspnr.config.ModConfig;
 import com.findspnr.tracker.BaseInfo;
 import com.findspnr.tracker.BaseTracker;
+import com.findspnr.tracker.BastionInfo;
+import com.findspnr.tracker.BastionTracker;
+import com.findspnr.tracker.FreecamController;
 import com.findspnr.tracker.SpawnerInfo;
 import com.findspnr.tracker.SpawnerTracker;
 import net.minecraft.client.MinecraftClient;
@@ -16,20 +19,21 @@ import java.util.List;
 
 /**
  * Free Fire / Tactical Style Minimap & HUD:
- *  1. Top-left text summary listing detected spawners and base items (Shulker Boxes & Ender Chests).
+ *  1. Top-left text summary listing detected spawners, base items, and Bastions.
  *  2. Middle-top player coordinate overlay (XYZ: X / Y / Z).
  *  3. Top-right minimap radar:
  *     • Red dots = Monster Spawners
  *     • Yellow dots = Shulker Boxes
  *     • Cyan dots = Ender Chests
+ *     • Orange dots = Nether Bastions
  *     • Fixed North-Up orientation with rotating Green Player Arrow.
  */
 public class HUDRadarRenderer {
 
     private static final int COL_HEADER     = 0xFFFF3333; // bright red
     private static final int COL_BASE_HEAD  = 0xFF00E5FF; // cyan
+    private static final int COL_BAST_HEAD  = 0xFFFF9900; // orange
     private static final int COL_ENTRY      = 0xFFFFFFFF;
-    private static final int COL_EMPTY      = 0xFFAAAAAA;
     private static final int COL_DOT        = 0xFFFF0000; // bright spawner red dot
     private static final int COL_DOT_BORDER = 0xFFFFFFFF; // white outline
     private static final int COL_PLAYER     = 0xFF00FF00; // green player arrow
@@ -45,15 +49,16 @@ public class HUDRadarRenderer {
 
         List<SpawnerInfo> spawners = SpawnerTracker.getDetectedSpawners();
         List<BaseInfo> bases = ModConfig.renderBaseFinder ? BaseTracker.getDetectedBases() : List.of();
+        List<BastionInfo> bastions = ModConfig.renderBastionFinder ? BastionTracker.getDetectedBastions() : List.of();
 
         TextRenderer tr = mc.textRenderer;
 
-        renderTextList(ctx, tr, spawners, bases);
+        renderTextList(ctx, tr, spawners, bases, bastions);
         renderMiddleTopCoords(ctx, mc, tr);
-        renderRadar(ctx, mc, tr, spawners, bases);
+        renderRadar(ctx, mc, tr, spawners, bases, bastions);
     }
 
-    private static void renderTextList(DrawContext ctx, TextRenderer tr, List<SpawnerInfo> spawners, List<BaseInfo> bases) {
+    private static void renderTextList(DrawContext ctx, TextRenderer tr, List<SpawnerInfo> spawners, List<BaseInfo> bases, List<BastionInfo> bastions) {
         int x = 10;
         int y = 10;
 
@@ -90,13 +95,37 @@ public class HUDRadarRenderer {
                 }
             }
         }
+
+        if (ModConfig.renderBastionFinder) {
+            y += 4;
+            ctx.drawTextWithShadow(tr, "§6§l[Bastion Finder] §fTargets: §e" + bastions.size(), x, y, COL_BAST_HEAD);
+            y += 12;
+
+            if (!bastions.isEmpty()) {
+                int limit = Math.min(bastions.size(), 4);
+                for (int i = 0; i < limit; i++) {
+                    BastionInfo info = bastions.get(i);
+                    BlockPos p = info.getPos();
+                    String line = String.format("§6• %s §7(%.1fm) §8[%d/%d/%d]",
+                            info.getType(), info.getDistance(), p.getX(), p.getY(), p.getZ());
+                    ctx.drawTextWithShadow(tr, line, x, y, COL_ENTRY);
+                    y += 10;
+                }
+            }
+        }
+
+        if (ModConfig.freecamEnabled) {
+            y += 4;
+            ctx.drawTextWithShadow(tr, "§c§l[Freecam Mode Active] §7(Press K to Exit)", x, y, 0xFFFF3333);
+        }
     }
 
     private static void renderMiddleTopCoords(DrawContext ctx, MinecraftClient mc, TextRenderer tr) {
         if (mc.player == null) return;
 
-        BlockPos p = mc.player.getBlockPos();
-        String text = String.format("§7XYZ: §e%d §7/ §e%d §7/ §e%d", p.getX(), p.getY(), p.getZ());
+        BlockPos p = ModConfig.freecamEnabled ? BlockPos.ofFloored(FreecamController.getFreecamPos()) : mc.player.getBlockPos();
+        String text = String.format("§7XYZ: §e%d §7/ §e%d §7/ §e%d %s",
+                p.getX(), p.getY(), p.getZ(), ModConfig.freecamEnabled ? "§c(Freecam)" : "");
         int textWidth = tr.getWidth(text);
         int screenW = mc.getWindow().getScaledWidth();
 
@@ -109,7 +138,7 @@ public class HUDRadarRenderer {
         ctx.drawTextWithShadow(tr, text, x, y, 0xFFFFFFFF);
     }
 
-    private static void renderRadar(DrawContext ctx, MinecraftClient mc, TextRenderer tr, List<SpawnerInfo> spawners, List<BaseInfo> bases) {
+    private static void renderRadar(DrawContext ctx, MinecraftClient mc, TextRenderer tr, List<SpawnerInfo> spawners, List<BaseInfo> bases, List<BastionInfo> bastions) {
         int screenW = mc.getWindow().getScaledWidth();
         int RADIUS = 44;                             // radar radius (px)
         int cx = screenW - RADIUS - 18;             // center X
@@ -131,7 +160,7 @@ public class HUDRadarRenderer {
 
         if (mc.player == null) return;
 
-        Vec3d playerPos = mc.player.getPos();
+        Vec3d playerPos = ModConfig.freecamEnabled ? FreecamController.getFreecamPos() : mc.player.getPos();
         double maxDist = ModConfig.scanRadiusChunks * 16.0;
         double scale = RADIUS / maxDist;
 
@@ -192,8 +221,37 @@ public class HUDRadarRenderer {
             }
         }
 
-        // 6. Draw Player Rotating Green Arrow
-        float yaw = mc.player.getYaw();
+        // 6. Draw Bastion Dots (Orange)
+        if (ModConfig.renderBastionFinder) {
+            for (BastionInfo bastion : bastions) {
+                BlockPos p = bastion.getPos();
+
+                double dx = (p.getX() + 0.5) - playerPos.x;
+                double dz = (p.getZ() + 0.5) - playerPos.z;
+
+                double projX = dx * scale;
+                double projZ = dz * scale;
+
+                double dist = Math.sqrt(projX * projX + projZ * projZ);
+                if (dist > RADIUS) {
+                    double factor = RADIUS / dist;
+                    projX *= factor;
+                    projZ *= factor;
+                }
+
+                int dotX = cx + (int) projX;
+                int dotY = cy + (int) projZ;
+
+                dotX = Math.max(cx - RADIUS + 2, Math.min(cx + RADIUS - 2, dotX));
+                dotY = Math.max(cy - RADIUS + 2, Math.min(cy + RADIUS - 2, dotY));
+
+                ctx.fill(dotX - 2, dotY - 2, dotX + 2, dotY + 2, 0xFFFF9900);
+                ctx.drawBorder(dotX - 2, dotY - 2, 4, 4, COL_DOT_BORDER);
+            }
+        }
+
+        // 7. Draw Player Rotating Green Arrow
+        float yaw = ModConfig.freecamEnabled ? FreecamController.getFreecamYaw() : mc.player.getYaw();
         renderPlayerArrow(ctx, cx, cy, yaw);
     }
 
