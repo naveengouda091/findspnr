@@ -3,6 +3,8 @@ package com.findspnr.render;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.findspnr.config.ModConfig;
+import com.findspnr.tracker.BaseInfo;
+import com.findspnr.tracker.BaseTracker;
 import com.findspnr.tracker.SpawnerInfo;
 import com.findspnr.tracker.SpawnerTracker;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
@@ -24,10 +26,12 @@ import java.util.List;
 
 /**
  * 3D World ESP & Tracer Lines Renderer:
- *  1. Renders a thin red tracer thread connecting player crosshair directly to each spawner.
- *  2. Renders a bright red 3D bounding box outline around each spawner block.
- *  3. Uses direct GlStateManager._disableDepthTest() right before drawWithGlobalProgram
- *     so lines & tracers render 100% THROUGH ALL BLOCKS (Stone, Dirt, Ice, Bedrock)!
+ *  1. Renders thin tracer threads connecting player crosshair directly to target blocks.
+ *  2. Renders 3D bounding box outlines around targets:
+ *     • Red = Monster Spawners
+ *     • Yellow = Shulker Boxes
+ *     • Cyan = Ender Chests
+ *  3. Uses direct GlStateManager._disableDepthTest() so lines & tracers render 100% THROUGH ALL BLOCKS!
  */
 public class WorldRenderESP {
 
@@ -40,7 +44,9 @@ public class WorldRenderESP {
         }
 
         List<SpawnerInfo> spawners = SpawnerTracker.getDetectedSpawners();
-        if (spawners.isEmpty()) {
+        List<BaseInfo> bases = ModConfig.renderBaseFinder ? BaseTracker.getDetectedBases() : List.of();
+
+        if (spawners.isEmpty() && bases.isEmpty()) {
             return;
         }
 
@@ -64,25 +70,47 @@ public class WorldRenderESP {
         BufferBuilder bufferBuilder = tessellator.begin(VertexFormat.DrawMode.LINES, VertexFormats.LINES);
         Matrix4f matrix = matrices.peek().getPositionMatrix();
 
+        // 1. Render Spawner Targets (Bright Red)
         for (SpawnerInfo spawner : spawners) {
             BlockPos pos = spawner.getPos();
 
-            // Center position of spawner relative to camera
             double targetX = pos.getX() + 0.5 - cameraPos.x;
             double targetY = pos.getY() + 0.5 - cameraPos.y;
             double targetZ = pos.getZ() + 0.5 - cameraPos.z;
 
-            // 1. Tracer line (thin red thread from crosshair center (0,0,0) to spawner center)
+            // Tracer line (thin red thread from crosshair center to spawner center)
             line(bufferBuilder, matrix, 0f, 0f, 0f, (float) targetX, (float) targetY, (float) targetZ, 1.0f, 0.0f, 0.0f, 1.0f);
 
-            // 2. Outer 1x1x1 spawner box outline (Bright Red)
+            // Outer 1x1x1 spawner box outline (Bright Red)
             drawBoxOutline(bufferBuilder, matrix, targetX - 0.5, targetY - 0.5, targetZ - 0.5,
                            targetX + 0.5, targetY + 0.5, targetZ + 0.5, 1.0f, 0.0f, 0.0f, 1.0f);
 
-            // 3. Inner core box (Bright Yellow/Red)
+            // Inner core box (Bright Yellow/Red)
             double s = 0.15;
             drawBoxOutline(bufferBuilder, matrix, targetX - s, targetY - s, targetZ - s,
                            targetX + s, targetY + s, targetZ + s, 1.0f, 0.8f, 0.0f, 1.0f);
+        }
+
+        // 2. Render Base Targets (Shulker Box = Yellow, Ender Chest = Cyan)
+        if (ModConfig.renderBaseFinder) {
+            for (BaseInfo base : bases) {
+                BlockPos pos = base.getPos();
+
+                double targetX = pos.getX() + 0.5 - cameraPos.x;
+                double targetY = pos.getY() + 0.5 - cameraPos.y;
+                double targetZ = pos.getZ() + 0.5 - cameraPos.z;
+
+                float r = base.isShulkerBox() ? 1.0f : 0.0f;
+                float g = base.isShulkerBox() ? 0.85f : 0.95f;
+                float b = base.isShulkerBox() ? 0.0f : 1.0f;
+
+                // Tracer line (yellow or cyan thread)
+                line(bufferBuilder, matrix, 0f, 0f, 0f, (float) targetX, (float) targetY, (float) targetZ, r, g, b, 1.0f);
+
+                // 3D box outline (yellow or cyan)
+                drawBoxOutline(bufferBuilder, matrix, targetX - 0.5, targetY - 0.5, targetZ - 0.5,
+                               targetX + 0.5, targetY + 0.5, targetZ + 0.5, r, g, b, 1.0f);
+            }
         }
 
         // FORCE OpenGL depth test disabled RIGHT BEFORE actual GPU draw call

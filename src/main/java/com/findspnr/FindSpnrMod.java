@@ -3,6 +3,8 @@ package com.findspnr;
 import com.findspnr.config.ModConfig;
 import com.findspnr.render.HUDRadarRenderer;
 import com.findspnr.render.WorldRenderESP;
+import com.findspnr.tracker.BaseInfo;
+import com.findspnr.tracker.BaseTracker;
 import com.findspnr.tracker.SpawnerInfo;
 import com.findspnr.tracker.SpawnerTracker;
 import net.fabricmc.api.ClientModInitializer;
@@ -22,16 +24,13 @@ import org.lwjgl.glfw.GLFW;
 import java.util.List;
 
 /**
- * FindSpnr – Dungeon Radar
+ * FindSpnr – Dungeon & Base Radar
  *
  * Client-only Fabric mod for Minecraft.
- * Scans loaded chunks for monster spawners (dungeons) and renders:
- *   • A HUD radar with red dots (top-right)
- *   • 3-D glowing outlines in the world (through walls)
- *   • A text list of the nearest spawners (top-left)
+ * Scans loaded chunks for monster spawners (dungeons) and base treasure (Shulker Boxes & Ender Chests).
  *
  * Keybinding   : G  → toggle entire mod
- * Chat commands: /findspnr toggle | esp | radar | list
+ * Chat commands: /findspnr toggle | base | esp | radar | list
  */
 public class FindSpnrMod implements ClientModInitializer {
 
@@ -40,7 +39,7 @@ public class FindSpnrMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        System.out.println("[FindSpnr] Initialising Dungeon Radar...");
+        System.out.println("[FindSpnr] Initialising Dungeon & Base Radar...");
 
         // ── 1. Key binding (default G) ─────────────────────────────────────────
         toggleKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
@@ -61,8 +60,9 @@ public class FindSpnrMod implements ClientModInitializer {
                                     (ModConfig.enabled ? "§aENABLED ✔" : "§cDISABLED ✖")), true);
                 }
             }
-            // Run spawner scanner
+            // Run spawner & base scanners
             SpawnerTracker.tick(client);
+            BaseTracker.tick(client);
         });
 
         // ── 3. Render hooks ────────────────────────────────────────────────────
@@ -70,7 +70,10 @@ public class FindSpnrMod implements ClientModInitializer {
         HudRenderCallback.EVENT.register(HUDRadarRenderer::render);
 
         // ── 4. Clear cache on disconnect ───────────────────────────────────────
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> SpawnerTracker.clear());
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            SpawnerTracker.clear();
+            BaseTracker.clear();
+        });
 
         // ── 5. Chat commands ───────────────────────────────────────────────────
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
@@ -79,6 +82,13 @@ public class FindSpnrMod implements ClientModInitializer {
                             ModConfig.enabled = !ModConfig.enabled;
                             ctx.getSource().sendFeedback(Text.literal(
                                     "§c[FindSpnr] §fMod " + (ModConfig.enabled ? "§aENABLED" : "§cDISABLED")));
+                            return 1;
+                        }))
+                        .then(ClientCommandManager.literal("base").executes(ctx -> {
+                            ModConfig.renderBaseFinder = !ModConfig.renderBaseFinder;
+                            ctx.getSource().sendFeedback(Text.literal(
+                                    "§c[FindSpnr] §fBase Finder (Shulker Box / Ender Chest) " +
+                                            (ModConfig.renderBaseFinder ? "§aENABLED ✔" : "§cDISABLED ✖")));
                             return 1;
                         }))
                         .then(ClientCommandManager.literal("esp").executes(ctx -> {
@@ -94,19 +104,34 @@ public class FindSpnrMod implements ClientModInitializer {
                             return 1;
                         }))
                         .then(ClientCommandManager.literal("list").executes(ctx -> {
-                            List<SpawnerInfo> list = SpawnerTracker.getDetectedSpawners();
-                            if (list.isEmpty()) {
+                            List<SpawnerInfo> spawners = SpawnerTracker.getDetectedSpawners();
+                            List<BaseInfo> bases = BaseTracker.getDetectedBases();
+
+                            if (spawners.isEmpty() && bases.isEmpty()) {
                                 ctx.getSource().sendFeedback(Text.literal(
-                                        "§c[FindSpnr] §7No spawners detected in loaded chunks."));
+                                        "§c[FindSpnr] §7No spawners or base treasure detected in loaded chunks."));
                             } else {
-                                ctx.getSource().sendFeedback(Text.literal(
-                                        "§c[FindSpnr] §aFound §e" + list.size() + " §aspawner(s):"));
-                                for (SpawnerInfo info : list) {
-                                    BlockPos p = info.getPos();
-                                    ctx.getSource().sendFeedback(Text.literal(String.format(
-                                            " §e• %s §7(%.1fm) §8at [%d, %d, %d]",
-                                            info.getFormattedName(), info.getDistance(),
-                                            p.getX(), p.getY(), p.getZ())));
+                                if (!spawners.isEmpty()) {
+                                    ctx.getSource().sendFeedback(Text.literal(
+                                            "§c[FindSpnr] §aFound §e" + spawners.size() + " §aspawner(s):"));
+                                    for (SpawnerInfo info : spawners) {
+                                        BlockPos p = info.getPos();
+                                        ctx.getSource().sendFeedback(Text.literal(String.format(
+                                                " §e• %s §7(%.1fm) §8at [%d, %d, %d]",
+                                                info.getFormattedName(), info.getDistance(),
+                                                p.getX(), p.getY(), p.getZ())));
+                                    }
+                                }
+                                if (!bases.isEmpty()) {
+                                    ctx.getSource().sendFeedback(Text.literal(
+                                            "§c[FindSpnr] §bFound §e" + bases.size() + " §bbase item(s):"));
+                                    for (BaseInfo info : bases) {
+                                        BlockPos p = info.getPos();
+                                        ctx.getSource().sendFeedback(Text.literal(String.format(
+                                                " §b• %s §7(%.1fm) §8at [%d, %d, %d]",
+                                                info.getType(), info.getDistance(),
+                                                p.getX(), p.getY(), p.getZ())));
+                                    }
                                 }
                             }
                             return 1;
@@ -114,6 +139,6 @@ public class FindSpnrMod implements ClientModInitializer {
                 )
         );
 
-        System.out.println("[FindSpnr] Ready! Press G to toggle.");
+        System.out.println("[FindSpnr] Ready! Press G to toggle, use /findspnr base for Base Finder.");
     }
 }

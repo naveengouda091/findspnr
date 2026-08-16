@@ -1,6 +1,8 @@
 package com.findspnr.render;
 
 import com.findspnr.config.ModConfig;
+import com.findspnr.tracker.BaseInfo;
+import com.findspnr.tracker.BaseTracker;
 import com.findspnr.tracker.SpawnerInfo;
 import com.findspnr.tracker.SpawnerTracker;
 import net.minecraft.client.MinecraftClient;
@@ -14,13 +16,18 @@ import java.util.List;
 
 /**
  * Free Fire / Tactical Style Minimap & HUD:
- *  1. Top-left text summary listing detected spawners with coords and distance.
+ *  1. Top-left text summary listing detected spawners and base items (Shulker Boxes & Ender Chests).
  *  2. Middle-top player coordinate overlay (XYZ: X / Y / Z).
- *  3. Top-right minimap radar with fixed North-Up orientation and rotating Green Player Arrow.
+ *  3. Top-right minimap radar:
+ *     • Red dots = Monster Spawners
+ *     • Yellow dots = Shulker Boxes
+ *     • Cyan dots = Ender Chests
+ *     • Fixed North-Up orientation with rotating Green Player Arrow.
  */
 public class HUDRadarRenderer {
 
     private static final int COL_HEADER     = 0xFFFF3333; // bright red
+    private static final int COL_BASE_HEAD  = 0xFF00E5FF; // cyan
     private static final int COL_ENTRY      = 0xFFFFFFFF;
     private static final int COL_EMPTY      = 0xFFAAAAAA;
     private static final int COL_DOT        = 0xFFFF0000; // bright spawner red dot
@@ -37,44 +44,54 @@ public class HUDRadarRenderer {
         if (mc.player == null || mc.options.hudHidden) return;
 
         List<SpawnerInfo> spawners = SpawnerTracker.getDetectedSpawners();
+        List<BaseInfo> bases = ModConfig.renderBaseFinder ? BaseTracker.getDetectedBases() : List.of();
+
         TextRenderer tr = mc.textRenderer;
 
-        renderTextList(ctx, tr, spawners);
+        renderTextList(ctx, tr, spawners, bases);
         renderMiddleTopCoords(ctx, mc, tr);
-        renderRadar(ctx, mc, tr, spawners);
+        renderRadar(ctx, mc, tr, spawners, bases);
     }
 
-    private static void renderTextList(DrawContext ctx, TextRenderer tr, List<SpawnerInfo> spawners) {
+    private static void renderTextList(DrawContext ctx, TextRenderer tr, List<SpawnerInfo> spawners, List<BaseInfo> bases) {
         int x = 10;
         int y = 10;
 
-        ctx.drawTextWithShadow(tr, "§c§l[FindSpnr] §fDetected: §e" + spawners.size(), x, y, COL_HEADER);
-        y += 13;
+        ctx.drawTextWithShadow(tr, "§c§l[FindSpnr] §fSpawners: §e" + spawners.size(), x, y, COL_HEADER);
+        y += 12;
 
-        if (spawners.isEmpty()) {
-            ctx.drawTextWithShadow(tr, "§7No spawners in loaded chunks", x, y, COL_EMPTY);
-            return;
+        if (!spawners.isEmpty()) {
+            int limit = Math.min(spawners.size(), 4);
+            for (int i = 0; i < limit; i++) {
+                SpawnerInfo info = spawners.get(i);
+                BlockPos p = info.getPos();
+                String line = String.format("§e• %s §7(%.1fm) §8[%d/%d/%d]",
+                        info.getFormattedName(), info.getDistance(), p.getX(), p.getY(), p.getZ());
+                ctx.drawTextWithShadow(tr, line, x, y, COL_ENTRY);
+                y += 10;
+            }
         }
 
-        int limit = Math.min(spawners.size(), 6);
-        for (int i = 0; i < limit; i++) {
-            SpawnerInfo info = spawners.get(i);
-            BlockPos p = info.getPos();
-            String line = String.format("§e• %s §7(%.1fm) §8[%d/%d/%d]",
-                    info.getFormattedName(), info.getDistance(), p.getX(), p.getY(), p.getZ());
-            ctx.drawTextWithShadow(tr, line, x, y, COL_ENTRY);
-            y += 10;
-        }
+        if (ModConfig.renderBaseFinder) {
+            y += 4;
+            ctx.drawTextWithShadow(tr, "§b§l[Base Finder] §fTargets: §e" + bases.size(), x, y, COL_BASE_HEAD);
+            y += 12;
 
-        if (spawners.size() > limit) {
-            ctx.drawTextWithShadow(tr,
-                    "§8  … and " + (spawners.size() - limit) + " more", x, y, COL_EMPTY);
+            if (!bases.isEmpty()) {
+                int limit = Math.min(bases.size(), 4);
+                for (int i = 0; i < limit; i++) {
+                    BaseInfo info = bases.get(i);
+                    BlockPos p = info.getPos();
+                    String colorTag = info.isShulkerBox() ? "§e" : "§b";
+                    String line = String.format("%s• %s §7(%.1fm) §8[%d/%d/%d]",
+                            colorTag, info.getType(), info.getDistance(), p.getX(), p.getY(), p.getZ());
+                    ctx.drawTextWithShadow(tr, line, x, y, COL_ENTRY);
+                    y += 10;
+                }
+            }
         }
     }
 
-    /**
-     * Renders player coordinates (XYZ) centered at the top middle of the screen.
-     */
     private static void renderMiddleTopCoords(DrawContext ctx, MinecraftClient mc, TextRenderer tr) {
         if (mc.player == null) return;
 
@@ -86,14 +103,13 @@ public class HUDRadarRenderer {
         int x = (screenW - textWidth) / 2;
         int y = 10;
 
-        // Dark background bar for high contrast
         ctx.fill(x - 6, y - 3, x + textWidth + 6, y + 11, 0xAA000000);
         ctx.drawBorder(x - 6, y - 3, textWidth + 12, 14, 0xFF555555);
 
         ctx.drawTextWithShadow(tr, text, x, y, 0xFFFFFFFF);
     }
 
-    private static void renderRadar(DrawContext ctx, MinecraftClient mc, TextRenderer tr, List<SpawnerInfo> spawners) {
+    private static void renderRadar(DrawContext ctx, MinecraftClient mc, TextRenderer tr, List<SpawnerInfo> spawners, List<BaseInfo> bases) {
         int screenW = mc.getWindow().getScaledWidth();
         int RADIUS = 44;                             // radar radius (px)
         int cx = screenW - RADIUS - 18;             // center X
@@ -119,11 +135,10 @@ public class HUDRadarRenderer {
         double maxDist = ModConfig.scanRadiusChunks * 16.0;
         double scale = RADIUS / maxDist;
 
-        // 4. Draw Spawner Red Dots (North-Up fixed map projection)
+        // 4. Draw Spawner Red Dots
         for (SpawnerInfo spawner : spawners) {
             BlockPos p = spawner.getPos();
 
-            // World offset: +X = East (Right), +Z = South (Down)
             double dx = (p.getX() + 0.5) - playerPos.x;
             double dz = (p.getZ() + 0.5) - playerPos.z;
 
@@ -138,51 +153,70 @@ public class HUDRadarRenderer {
             }
 
             int dotX = cx + (int) projX;
-            int dotY = cy + (int) projZ; // +Z is South (Down on screen)
+            int dotY = cy + (int) projZ;
 
-            // Clamp inside minimap box
             dotX = Math.max(cx - RADIUS + 2, Math.min(cx + RADIUS - 2, dotX));
             dotY = Math.max(cy - RADIUS + 2, Math.min(cy + RADIUS - 2, dotY));
 
-            // Draw bright red spawner dot (4x4 square with white outline)
             ctx.fill(dotX - 2, dotY - 2, dotX + 2, dotY + 2, COL_DOT);
             ctx.drawBorder(dotX - 2, dotY - 2, 4, 4, COL_DOT_BORDER);
         }
 
-        // 5. Draw Player Rotating Green Arrow at center (Free Fire style)
+        // 5. Draw Base Finder Dots (Yellow = Shulker, Cyan = Ender Chest)
+        if (ModConfig.renderBaseFinder) {
+            for (BaseInfo base : bases) {
+                BlockPos p = base.getPos();
+
+                double dx = (p.getX() + 0.5) - playerPos.x;
+                double dz = (p.getZ() + 0.5) - playerPos.z;
+
+                double projX = dx * scale;
+                double projZ = dz * scale;
+
+                double dist = Math.sqrt(projX * projX + projZ * projZ);
+                if (dist > RADIUS) {
+                    double factor = RADIUS / dist;
+                    projX *= factor;
+                    projZ *= factor;
+                }
+
+                int dotX = cx + (int) projX;
+                int dotY = cy + (int) projZ;
+
+                dotX = Math.max(cx - RADIUS + 2, Math.min(cx + RADIUS - 2, dotX));
+                dotY = Math.max(cy - RADIUS + 2, Math.min(cy + RADIUS - 2, dotY));
+
+                int dotColor = base.isShulkerBox() ? 0xFFFFD700 : 0xFF00E5FF;
+                ctx.fill(dotX - 2, dotY - 2, dotX + 2, dotY + 2, dotColor);
+                ctx.drawBorder(dotX - 2, dotY - 2, 4, 4, COL_DOT_BORDER);
+            }
+        }
+
+        // 6. Draw Player Rotating Green Arrow
         float yaw = mc.player.getYaw();
         renderPlayerArrow(ctx, cx, cy, yaw);
     }
 
-    /**
-     * Renders a crisp green directional player arrow pointing in the direction of the player's yaw.
-     */
     private static void renderPlayerArrow(DrawContext ctx, int cx, int cy, float yaw) {
         double rad = Math.toRadians(yaw);
 
-        // Forward unit vector
-        double fwdX = -Math.sin(rad); // East/West
-        double fwdY = Math.cos(rad);  // South/North
+        double fwdX = -Math.sin(rad);
+        double fwdY = Math.cos(rad);
 
-        // Tip of the arrow
         int tipX = cx + (int) (fwdX * 7);
         int tipY = cy + (int) (fwdY * 7);
 
-        // Left base corner
         int leftX = cx + (int) (-fwdX * 3 + fwdY * 3);
         int leftY = cy + (int) (-fwdY * 3 - fwdX * 3);
 
-        // Right base corner
         int rightX = cx + (int) (-fwdX * 3 - fwdY * 3);
         int rightY = cy + (int) (-fwdY * 3 + fwdX * 3);
 
-        // Draw arrow body & lines (Green player indicator)
         ctx.fill(cx - 2, cy - 2, cx + 2, cy + 2, COL_PLAYER);
         ctx.fill(tipX - 1, tipY - 1, tipX + 1, tipY + 1, COL_PLAYER);
         ctx.fill(leftX - 1, leftY - 1, leftX + 1, leftY + 1, COL_PLAYER);
         ctx.fill(rightX - 1, rightY - 1, rightX + 1, rightY + 1, COL_PLAYER);
 
-        // Pointer line from center to tip
         ctx.fill(Math.min(cx, tipX), Math.min(cy, tipY), Math.max(cx, tipX) + 1, Math.max(cy, tipY) + 1, COL_PLAYER);
     }
 }

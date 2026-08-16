@@ -15,6 +15,9 @@ public class ModConfig {
     /** Draw the HUD radar in the top-right corner */
     public static boolean renderHUDRadar = true;
 
+    /** Base Finder toggle (/findspnr base) – tracks Shulker Boxes & Ender Chests */
+    public static boolean renderBaseFinder = false;
+
     /** How many chunks around the player to scan (default 5 = 80 block radius) */
     public static int scanRadiusChunks = 5;
 }
