@@ -18,6 +18,9 @@ public class ModConfig {
     /** Base Finder toggle (/findspnr base) – tracks Shulker Boxes & Ender Chests */
     public static boolean renderBaseFinder = false;
 
-    /** How many chunks around the player to scan (default 5 = 80 block radius) */
-    public static int scanRadiusChunks = 5;
+    /** Freecam toggle (Press K or /findspnr freecam) */
+    public static boolean freecamEnabled = false;
+
+    /** How many chunks around the player to scan (default 8 = 128 block radius) */
+    public static int scanRadiusChunks = 8;
 }

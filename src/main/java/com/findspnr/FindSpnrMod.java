@@ -5,6 +5,7 @@ import com.findspnr.render.HUDRadarRenderer;
 import com.findspnr.render.WorldRenderESP;
 import com.findspnr.tracker.BaseInfo;
 import com.findspnr.tracker.BaseTracker;
+import com.findspnr.tracker.FreecamController;
 import com.findspnr.tracker.SpawnerInfo;
 import com.findspnr.tracker.SpawnerTracker;
 import net.fabricmc.api.ClientModInitializer;
@@ -30,18 +31,20 @@ import java.util.List;
  * Scans loaded chunks for monster spawners (dungeons) and base treasure (Shulker Boxes & Ender Chests).
  *
  * Keybinding   : G  → toggle entire mod
- * Chat commands: /findspnr toggle | base | esp | radar | list
+ * Keybinding   : K  → toggle Freecam mode
+ * Chat commands: /findspnr toggle | base | freecam | esp | radar | list
  */
 public class FindSpnrMod implements ClientModInitializer {
 
     public static final String MOD_ID = "findspnr";
     private static KeyBinding toggleKey;
+    private static KeyBinding freecamKey;
 
     @Override
     public void onInitializeClient() {
-        System.out.println("[FindSpnr] Initialising Dungeon & Base Radar...");
+        System.out.println("[FindSpnr] Initialising Dungeon, Base Radar & Freecam...");
 
-        // ── 1. Key binding (default G) ─────────────────────────────────────────
+        // ── 1. Key bindings ────────────────────────────────────────────────────
         toggleKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.findspnr.toggle",
                 InputUtil.Type.KEYSYM,
@@ -49,9 +52,16 @@ public class FindSpnrMod implements ClientModInitializer {
                 "category.findspnr.title"
         ));
 
+        freecamKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.findspnr.freecam",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_K,
+                "category.findspnr.title"
+        ));
+
         // ── 2. Tick listener ───────────────────────────────────────────────────
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            // Handle toggle key press
+            // Handle master toggle key press (G)
             while (toggleKey.wasPressed()) {
                 ModConfig.enabled = !ModConfig.enabled;
                 if (client.player != null) {
@@ -60,9 +70,16 @@ public class FindSpnrMod implements ClientModInitializer {
                                     (ModConfig.enabled ? "§aENABLED ✔" : "§cDISABLED ✖")), true);
                 }
             }
-            // Run spawner & base scanners
+
+            // Handle Freecam key press (K)
+            while (freecamKey.wasPressed()) {
+                FreecamController.toggle(client);
+            }
+
+            // Run trackers & freecam
             SpawnerTracker.tick(client);
             BaseTracker.tick(client);
+            FreecamController.tick(client);
         });
 
         // ── 3. Render hooks ────────────────────────────────────────────────────
@@ -73,6 +90,7 @@ public class FindSpnrMod implements ClientModInitializer {
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             SpawnerTracker.clear();
             BaseTracker.clear();
+            ModConfig.freecamEnabled = false;
         });
 
         // ── 5. Chat commands ───────────────────────────────────────────────────
@@ -89,6 +107,14 @@ public class FindSpnrMod implements ClientModInitializer {
                             ctx.getSource().sendFeedback(Text.literal(
                                     "§c[FindSpnr] §fBase Finder (Shulker Box / Ender Chest) " +
                                             (ModConfig.renderBaseFinder ? "§aENABLED ✔" : "§cDISABLED ✖")));
+                            return 1;
+                        }))
+                        .then(ClientCommandManager.literal("freecam").executes(ctx -> {
+                            FreecamController.toggle(ctx.getSource().getClient());
+                            return 1;
+                        }))
+                        .then(ClientCommandManager.literal("fc").executes(ctx -> {
+                            FreecamController.toggle(ctx.getSource().getClient());
                             return 1;
                         }))
                         .then(ClientCommandManager.literal("esp").executes(ctx -> {
@@ -139,6 +165,6 @@ public class FindSpnrMod implements ClientModInitializer {
                 )
         );
 
-        System.out.println("[FindSpnr] Ready! Press G to toggle, use /findspnr base for Base Finder.");
+        System.out.println("[FindSpnr] Ready! Press G for mod toggle, K for Freecam.");
     }
 }
