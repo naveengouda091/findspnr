@@ -33,7 +33,6 @@ import java.util.List;
  *  2. Renders 3D bounding box outlines around targets:
  *     • Red = Monster Spawners
  *     • Yellow = Shulker Boxes
- *     • Cyan = Ender Chests
  *     • Orange = Nether Bastion Remnants
  *  3. Uses direct GlStateManager._disableDepthTest() so lines & tracers render 100% THROUGH ALL BLOCKS!
  */
@@ -93,7 +92,7 @@ public class WorldRenderESP {
                            targetX + s, targetY + s, targetZ + s, 1.0f, 0.8f, 0.0f, 1.0f);
         }
 
-        // 2. Render Base Targets (Shulker Box = Yellow, Ender Chest = Cyan)
+        // 2. Render Base Targets (Shulker Box = Bright Yellow)
         if (ModConfig.renderBaseFinder) {
             for (BaseInfo base : bases) {
                 BlockPos pos = base.getPos();
@@ -102,9 +101,9 @@ public class WorldRenderESP {
                 double targetY = pos.getY() + 0.5 - cameraPos.y;
                 double targetZ = pos.getZ() + 0.5 - cameraPos.z;
 
-                float r = base.isShulkerBox() ? 1.0f : 0.0f;
-                float g = base.isShulkerBox() ? 0.85f : 0.95f;
-                float b = base.isShulkerBox() ? 0.0f : 1.0f;
+                float r = 1.0f;
+                float g = 0.85f;
+                float b = 0.0f;
 
                 line(bufferBuilder, matrix, 0f, 0f, 0f, (float) targetX, (float) targetY, (float) targetZ, r, g, b, 1.0f);
 

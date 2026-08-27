@@ -30,7 +30,7 @@ import java.util.List;
  * FindSpnr – Dungeon, Base & Bastion Radar
  *
  * Client-only Fabric mod for Minecraft.
- * Scans loaded chunks for monster spawners, base treasure (Shulker/Ender Chests), and Bastion Remnants.
+ * Scans loaded chunks for monster spawners, base treasure (Shulker Boxes), and Bastion Remnants.
  *
  * Keybinding   : G  → toggle entire mod
  * Keybinding   : K  → toggle Freecam mode
@@ -107,7 +107,7 @@ public class FindSpnrMod implements ClientModInitializer {
                         .then(ClientCommandManager.literal("base").executes(ctx -> {
                             ModConfig.renderBaseFinder = !ModConfig.renderBaseFinder;
                             ctx.getSource().sendFeedback(Text.literal(
-                                    "§c[FindSpnr] §fBase Finder (Shulker Box / Ender Chest) " +
+                                    "§c[FindSpnr] §fBase Finder (Shulker Box) " +
                                             (ModConfig.renderBaseFinder ? "§aENABLED ✔" : "§cDISABLED ✖")));
                             return 1;
                         }))
@@ -160,11 +160,11 @@ public class FindSpnrMod implements ClientModInitializer {
                                 }
                                 if (!bases.isEmpty()) {
                                     ctx.getSource().sendFeedback(Text.literal(
-                                            "§c[FindSpnr] §bFound §e" + bases.size() + " §bbase item(s):"));
+                                            "§c[FindSpnr] §bFound §e" + bases.size() + " §bshulker box(es):"));
                                     for (BaseInfo info : bases) {
                                         BlockPos p = info.getPos();
                                         ctx.getSource().sendFeedback(Text.literal(String.format(
-                                                " §b• %s §7(%.1fm) §8at [%d, %d, %d]",
+                                                " §e• %s §7(%.1fm) §8at [%d, %d, %d]",
                                                 info.getType(), info.getDistance(),
                                                 p.getX(), p.getY(), p.getZ())));
                                     }
@@ -186,6 +186,6 @@ public class FindSpnrMod implements ClientModInitializer {
                 )
         );
 
-        System.out.println("[FindSpnr] Ready! Press G for toggle, K for Freecam, use /findspnr bastion for Bastions.");
+        System.out.println("[FindSpnr] Ready! Press G for toggle, K for Freecam, use /findspnr base for Shulkers.");
     }
 }

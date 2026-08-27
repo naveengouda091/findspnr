@@ -2,10 +2,8 @@ package com.findspnr.tracker;
 
 import com.findspnr.config.ModConfig;
 import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
 import net.minecraft.block.ShulkerBoxBlock;
 import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.EnderChestBlockEntity;
 import net.minecraft.block.entity.ShulkerBoxBlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
@@ -21,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Separate Base & Treasure Finder Tracker:
  * Activated via command (/findspnr base).
- * Scans loaded chunks for Shulker Boxes and Ender Chests.
+ * Scans loaded chunks exclusively for Shulker Boxes.
  */
 public class BaseTracker {
 
@@ -93,10 +91,6 @@ public class BaseTracker {
                         BaseInfo info = new BaseInfo(pos, "Shulker Box");
                         info.updateDistance(playerPos);
                         detected.put(pos, info);
-                    } else if (be instanceof EnderChestBlockEntity) {
-                        BaseInfo info = new BaseInfo(pos, "Ender Chest");
-                        info.updateDistance(playerPos);
-                        detected.put(pos, info);
                     }
                 }
 
@@ -110,7 +104,7 @@ public class BaseTracker {
                     ChunkSection section = sections[i];
                     if (section == null || section.isEmpty()) continue;
 
-                    // Fast check: does 16x16x16 section contain Shulker Box or Ender Chest?
+                    // Fast check: does 16x16x16 section contain any Shulker Box?
                     if (!section.hasAny(BaseTracker::isTargetBlock)) {
                         continue; // Skip 4096 blocks instantly
                     }
@@ -128,8 +122,7 @@ public class BaseTracker {
                                 BlockState state = section.getBlockState(x, y, z);
                                 if (isTargetBlock(state)) {
                                     BlockPos immutablePos = mutablePos.toImmutable();
-                                    String type = (state.getBlock() instanceof ShulkerBoxBlock) ? "Shulker Box" : "Ender Chest";
-                                    BaseInfo info = new BaseInfo(immutablePos, type);
+                                    BaseInfo info = new BaseInfo(immutablePos, "Shulker Box");
                                     info.updateDistance(playerPos);
                                     detected.putIfAbsent(immutablePos, info);
                                 }
@@ -142,7 +135,7 @@ public class BaseTracker {
     }
 
     private static boolean isTargetBlock(BlockState state) {
-        return state.isOf(Blocks.ENDER_CHEST) || (state.getBlock() instanceof ShulkerBoxBlock);
+        return state.getBlock() instanceof ShulkerBoxBlock;
     }
 
     public static List<BaseInfo> getDetectedBases() {

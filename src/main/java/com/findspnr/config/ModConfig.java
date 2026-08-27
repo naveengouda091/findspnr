@@ -15,7 +15,7 @@ public class ModConfig {
     /** Draw the HUD radar in the top-right corner */
     public static boolean renderHUDRadar = true;
 
-    /** Base Finder toggle (/findspnr base) – tracks Shulker Boxes & Ender Chests */
+    /** Base Finder toggle (/findspnr base) – tracks Shulker Boxes */
     public static boolean renderBaseFinder = false;
 
     /** Bastion Finder toggle (/findspnr bastion) – tracks Nether Bastion Remnants */

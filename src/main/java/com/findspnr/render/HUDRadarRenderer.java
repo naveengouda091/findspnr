@@ -19,19 +19,18 @@ import java.util.List;
 
 /**
  * Free Fire / Tactical Style Minimap & HUD:
- *  1. Top-left text summary listing detected spawners, base items, and Bastions.
+ *  1. Top-left text summary listing detected spawners, Shulker Boxes, and Bastions.
  *  2. Middle-top player coordinate overlay (XYZ: X / Y / Z).
  *  3. Top-right minimap radar:
  *     • Red dots = Monster Spawners
  *     • Yellow dots = Shulker Boxes
- *     • Cyan dots = Ender Chests
  *     • Orange dots = Nether Bastions
  *     • Fixed North-Up orientation with rotating Green Player Arrow.
  */
 public class HUDRadarRenderer {
 
     private static final int COL_HEADER     = 0xFFFF3333; // bright red
-    private static final int COL_BASE_HEAD  = 0xFF00E5FF; // cyan
+    private static final int COL_BASE_HEAD  = 0xFFFFD700; // yellow for shulkers
     private static final int COL_BAST_HEAD  = 0xFFFF9900; // orange
     private static final int COL_ENTRY      = 0xFFFFFFFF;
     private static final int COL_DOT        = 0xFFFF0000; // bright spawner red dot
@@ -79,7 +78,7 @@ public class HUDRadarRenderer {
 
         if (ModConfig.renderBaseFinder) {
             y += 4;
-            ctx.drawTextWithShadow(tr, "§b§l[Base Finder] §fTargets: §e" + bases.size(), x, y, COL_BASE_HEAD);
+            ctx.drawTextWithShadow(tr, "§e§l[Shulker Finder] §fTargets: §e" + bases.size(), x, y, COL_BASE_HEAD);
             y += 12;
 
             if (!bases.isEmpty()) {
@@ -87,9 +86,8 @@ public class HUDRadarRenderer {
                 for (int i = 0; i < limit; i++) {
                     BaseInfo info = bases.get(i);
                     BlockPos p = info.getPos();
-                    String colorTag = info.isShulkerBox() ? "§e" : "§b";
-                    String line = String.format("%s• %s §7(%.1fm) §8[%d/%d/%d]",
-                            colorTag, info.getType(), info.getDistance(), p.getX(), p.getY(), p.getZ());
+                    String line = String.format("§e• %s §7(%.1fm) §8[%d/%d/%d]",
+                            info.getType(), info.getDistance(), p.getX(), p.getY(), p.getZ());
                     ctx.drawTextWithShadow(tr, line, x, y, COL_ENTRY);
                     y += 10;
                 }
@@ -191,7 +189,7 @@ public class HUDRadarRenderer {
             ctx.drawBorder(dotX - 2, dotY - 2, 4, 4, COL_DOT_BORDER);
         }
 
-        // 5. Draw Base Finder Dots (Yellow = Shulker, Cyan = Ender Chest)
+        // 5. Draw Base Finder Dots (Yellow = Shulker Boxes)
         if (ModConfig.renderBaseFinder) {
             for (BaseInfo base : bases) {
                 BlockPos p = base.getPos();
@@ -215,7 +213,7 @@ public class HUDRadarRenderer {
                 dotX = Math.max(cx - RADIUS + 2, Math.min(cx + RADIUS - 2, dotX));
                 dotY = Math.max(cy - RADIUS + 2, Math.min(cy + RADIUS - 2, dotY));
 
-                int dotColor = base.isShulkerBox() ? 0xFFFFD700 : 0xFF00E5FF;
+                int dotColor = 0xFFFFD700; // Bright Gold/Yellow
                 ctx.fill(dotX - 2, dotY - 2, dotX + 2, dotY + 2, dotColor);
                 ctx.drawBorder(dotX - 2, dotY - 2, 4, 4, COL_DOT_BORDER);
             }
