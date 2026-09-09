@@ -25,7 +25,7 @@ import java.util.List;
  *     • Red = Monster Spawners
  *     • Yellow = Shulker Boxes
  *     • Orange = Nether Bastion Remnants
- *  3. Uses RenderLayers.LINES directly via WorldRenderContext for 100% stable 1.21.11 rendering.
+ *  3. Uses RenderLayers.LINES directly via WorldRenderContext with 1.21.11 lineWidth support.
  */
 public class WorldRenderESP {
 
@@ -149,7 +149,7 @@ public class WorldRenderESP {
         float ny = len > 0 ? dy / len : 1f;
         float nz = len > 0 ? dz / len : 0f;
 
-        builder.vertex(entry, x1, y1, z1).color(r, g, b, a).normal(entry, nx, ny, nz);
-        builder.vertex(entry, x2, y2, z2).color(r, g, b, a).normal(entry, nx, ny, nz);
+        builder.vertex(entry, x1, y1, z1).color(r, g, b, a).normal(entry, nx, ny, nz).lineWidth(2.0f);
+        builder.vertex(entry, x2, y2, z2).color(r, g, b, a).normal(entry, nx, ny, nz).lineWidth(2.0f);
     }
 }
