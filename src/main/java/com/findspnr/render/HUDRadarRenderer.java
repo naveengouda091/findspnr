@@ -18,7 +18,7 @@ import net.minecraft.util.math.Vec3d;
 import java.util.List;
 
 /**
- * Free Fire / Tactical Style Minimap & HUD:
+ * Free Fire / Tactical Style Minimap & HUD (1.21.11 Compatible):
  *  1. Top-left text summary listing detected spawners, Shulker Boxes, and Bastions.
  *  2. Middle-top player coordinate overlay (XYZ: X / Y / Z).
  *  3. Top-right minimap radar:
@@ -131,7 +131,7 @@ public class HUDRadarRenderer {
         int y = 10;
 
         ctx.fill(x - 6, y - 3, x + textWidth + 6, y + 11, 0xAA000000);
-        ctx.drawBorder(x - 6, y - 3, textWidth + 12, 14, 0xFF555555);
+        drawBorder(ctx, x - 6, y - 3, textWidth + 12, 14, 0xFF555555);
 
         ctx.drawTextWithShadow(tr, text, x, y, 0xFFFFFFFF);
     }
@@ -144,7 +144,7 @@ public class HUDRadarRenderer {
 
         // 1. Draw background box
         ctx.fill(cx - RADIUS - 3, cy - RADIUS - 3, cx + RADIUS + 3, cy + RADIUS + 3, COL_BG);
-        ctx.drawBorder(cx - RADIUS - 3, cy - RADIUS - 3, (RADIUS * 2) + 6, (RADIUS * 2) + 6, COL_BORDER);
+        drawBorder(ctx, cx - RADIUS - 3, cy - RADIUS - 3, (RADIUS * 2) + 6, (RADIUS * 2) + 6, COL_BORDER);
 
         // 2. Draw crosshair grid
         ctx.fill(cx, cy - RADIUS, cx + 1, cy + RADIUS, 0x33FFFFFF);
@@ -158,7 +158,7 @@ public class HUDRadarRenderer {
 
         if (mc.player == null) return;
 
-        Vec3d playerPos = ModConfig.freecamEnabled ? FreecamController.getFreecamPos() : mc.player.getPos();
+        Vec3d playerPos = ModConfig.freecamEnabled ? FreecamController.getFreecamPos() : new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
         double maxDist = ModConfig.scanRadiusChunks * 16.0;
         double scale = RADIUS / maxDist;
 
@@ -186,7 +186,7 @@ public class HUDRadarRenderer {
             dotY = Math.max(cy - RADIUS + 2, Math.min(cy + RADIUS - 2, dotY));
 
             ctx.fill(dotX - 2, dotY - 2, dotX + 2, dotY + 2, COL_DOT);
-            ctx.drawBorder(dotX - 2, dotY - 2, 4, 4, COL_DOT_BORDER);
+            drawBorder(ctx, dotX - 2, dotY - 2, 4, 4, COL_DOT_BORDER);
         }
 
         // 5. Draw Base Finder Dots (Yellow = Shulker Boxes)
@@ -215,7 +215,7 @@ public class HUDRadarRenderer {
 
                 int dotColor = 0xFFFFD700; // Bright Gold/Yellow
                 ctx.fill(dotX - 2, dotY - 2, dotX + 2, dotY + 2, dotColor);
-                ctx.drawBorder(dotX - 2, dotY - 2, 4, 4, COL_DOT_BORDER);
+                drawBorder(ctx, dotX - 2, dotY - 2, 4, 4, COL_DOT_BORDER);
             }
         }
 
@@ -244,13 +244,20 @@ public class HUDRadarRenderer {
                 dotY = Math.max(cy - RADIUS + 2, Math.min(cy + RADIUS - 2, dotY));
 
                 ctx.fill(dotX - 2, dotY - 2, dotX + 2, dotY + 2, 0xFFFF9900);
-                ctx.drawBorder(dotX - 2, dotY - 2, 4, 4, COL_DOT_BORDER);
+                drawBorder(ctx, dotX - 2, dotY - 2, 4, 4, COL_DOT_BORDER);
             }
         }
 
         // 7. Draw Player Rotating Green Arrow
         float yaw = ModConfig.freecamEnabled ? FreecamController.getFreecamYaw() : mc.player.getYaw();
         renderPlayerArrow(ctx, cx, cy, yaw);
+    }
+
+    private static void drawBorder(DrawContext ctx, int x, int y, int width, int height, int color) {
+        ctx.fill(x, y, x + width, y + 1, color);
+        ctx.fill(x, y + height - 1, x + width, y + height, color);
+        ctx.fill(x, y + 1, x + 1, y + height - 1, color);
+        ctx.fill(x + width - 1, y + 1, x + width, y + height - 1, color);
     }
 
     private static void renderPlayerArrow(DrawContext ctx, int cx, int cy, float yaw) {

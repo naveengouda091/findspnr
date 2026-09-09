@@ -17,7 +17,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Separate Base & Treasure Finder Tracker:
+ * Separate Base & Treasure Finder Tracker (1.21.11 Compatible):
  * Activated via command (/findspnr base).
  * Scans loaded chunks exclusively for Shulker Boxes.
  */
@@ -34,13 +34,14 @@ public class BaseTracker {
 
         tickCounter++;
 
+        Vec3d playerPos = new Vec3d(client.player.getX(), client.player.getY(), client.player.getZ());
+
         // Full scan every 20 ticks (~1s)
         if (tickCounter % 20 == 0) {
-            scanChunks(client.world, client.player.getPos());
+            scanChunks(client.world, playerPos);
         }
 
         // Update distances every tick & auto-remove when player arrives (distance <= 3.5m)
-        Vec3d playerPos = client.player.getPos();
         detected.entrySet().removeIf(entry -> {
             BaseInfo info = entry.getValue();
             info.updateDistance(playerPos);

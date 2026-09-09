@@ -17,19 +17,20 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
 /**
- * FindSpnr – Dungeon, Base & Bastion Radar
+ * FindSpnr – Dungeon, Base & Bastion Radar (1.21.11 Compatible)
  *
- * Client-only Fabric mod for Minecraft.
+ * Client-only Fabric mod for Minecraft 1.21.11.
  * Scans loaded chunks for monster spawners, base treasure (Shulker Boxes), and Bastion Remnants.
  *
  * Keybinding   : G  → toggle entire mod
@@ -44,21 +45,23 @@ public class FindSpnrMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        System.out.println("[FindSpnr] Initialising Dungeon, Base & Bastion Radar...");
+        System.out.println("[FindSpnr] Initialising Dungeon, Base & Bastion Radar for 1.21.11...");
+
+        KeyBinding.Category category = KeyBinding.Category.create(Identifier.of("findspnr", "main"));
 
         // ── 1. Key bindings ────────────────────────────────────────────────────
         toggleKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.findspnr.toggle",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_G,
-                "category.findspnr.title"
+                category
         ));
 
         freecamKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.findspnr.freecam",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_K,
-                "category.findspnr.title"
+                category
         ));
 
         // ── 2. Tick listener ───────────────────────────────────────────────────
@@ -84,7 +87,7 @@ public class FindSpnrMod implements ClientModInitializer {
         });
 
         // ── 3. Render hooks ────────────────────────────────────────────────────
-        WorldRenderEvents.LAST.register(WorldRenderESP::render);
+        WorldRenderEvents.END_MAIN.register(WorldRenderESP::render);
         HudRenderCallback.EVENT.register(HUDRadarRenderer::render);
 
         // ── 4. Clear cache on disconnect ───────────────────────────────────────
@@ -186,6 +189,6 @@ public class FindSpnrMod implements ClientModInitializer {
                 )
         );
 
-        System.out.println("[FindSpnr] Ready! Press G for toggle, K for Freecam, use /findspnr base for Shulkers.");
+        System.out.println("[FindSpnr] Ready! Press G for toggle, K for Freecam.");
     }
 }

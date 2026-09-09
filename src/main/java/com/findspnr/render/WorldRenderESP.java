@@ -1,7 +1,5 @@
 package com.findspnr.render;
 
-import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.findspnr.config.ModConfig;
 import com.findspnr.tracker.BaseInfo;
 import com.findspnr.tracker.BaseTracker;
@@ -10,36 +8,26 @@ import com.findspnr.tracker.BastionTracker;
 import com.findspnr.tracker.FreecamController;
 import com.findspnr.tracker.SpawnerInfo;
 import com.findspnr.tracker.SpawnerTracker;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.ShaderProgram;
-import net.minecraft.client.render.BufferBuilder;
-import net.minecraft.client.render.BufferRenderer;
-import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.render.VertexFormat;
-import net.minecraft.client.render.VertexFormats;
+import net.minecraft.client.render.RenderLayers;
+import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
-import org.joml.Matrix4f;
 
-import java.lang.reflect.Method;
 import java.util.List;
 
 /**
- * 3D World ESP & Tracer Lines Renderer:
+ * 3D World ESP & Tracer Lines Renderer for Minecraft 1.21.11:
  *  1. Renders thin tracer threads connecting camera crosshair directly to target blocks.
  *  2. Renders 3D bounding box outlines around targets:
  *     • Red = Monster Spawners
  *     • Yellow = Shulker Boxes
  *     • Orange = Nether Bastion Remnants
- *  3. Uses direct GlStateManager._disableDepthTest() so lines & tracers render 100% THROUGH ALL BLOCKS!
+ *  3. Uses RenderLayers.LINES directly via WorldRenderContext for 100% stable 1.21.11 rendering.
  */
 public class WorldRenderESP {
-
-    private static Method shaderMethod = null;
-    private static boolean reflectionAttempted = false;
 
     public static void render(WorldRenderContext context) {
         if (!ModConfig.enabled || !ModConfig.renderWorldESP) {
@@ -57,22 +45,12 @@ public class WorldRenderESP {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null) return;
 
-        Vec3d cameraPos = ModConfig.freecamEnabled ? FreecamController.getFreecamPos() : context.camera().getPos();
-        MatrixStack matrices = context.matrixStack();
+        Vec3d cameraPos = ModConfig.freecamEnabled ? FreecamController.getFreecamPos() : client.player.getEyePos();
+        MatrixStack matrices = context.matrices();
+        VertexConsumer buffer = context.consumers().getBuffer(RenderLayers.LINES);
 
         matrices.push();
-
-        // Direct low-level OpenGL state overrides to force see-through lines everywhere
-        GlStateManager._disableDepthTest();
-        GlStateManager._depthMask(false);
-        GlStateManager._enableBlend();
-        GlStateManager._blendFunc(GlStateManager.SrcFactor.SRC_ALPHA.value, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA.value);
-
-        setLineShader();
-
-        Tessellator tessellator = Tessellator.getInstance();
-        BufferBuilder bufferBuilder = tessellator.begin(VertexFormat.DrawMode.LINES, VertexFormats.LINES);
-        Matrix4f matrix = matrices.peek().getPositionMatrix();
+        MatrixStack.Entry entry = matrices.peek();
 
         // 1. Render Spawner Targets (Bright Red)
         for (SpawnerInfo spawner : spawners) {
@@ -82,13 +60,13 @@ public class WorldRenderESP {
             double targetY = pos.getY() + 0.5 - cameraPos.y;
             double targetZ = pos.getZ() + 0.5 - cameraPos.z;
 
-            line(bufferBuilder, matrix, 0f, 0f, 0f, (float) targetX, (float) targetY, (float) targetZ, 1.0f, 0.0f, 0.0f, 1.0f);
+            line(buffer, entry, 0f, 0f, 0f, (float) targetX, (float) targetY, (float) targetZ, 1.0f, 0.0f, 0.0f, 1.0f);
 
-            drawBoxOutline(bufferBuilder, matrix, targetX - 0.5, targetY - 0.5, targetZ - 0.5,
+            drawBoxOutline(buffer, entry, targetX - 0.5, targetY - 0.5, targetZ - 0.5,
                            targetX + 0.5, targetY + 0.5, targetZ + 0.5, 1.0f, 0.0f, 0.0f, 1.0f);
 
             double s = 0.15;
-            drawBoxOutline(bufferBuilder, matrix, targetX - s, targetY - s, targetZ - s,
+            drawBoxOutline(buffer, entry, targetX - s, targetY - s, targetZ - s,
                            targetX + s, targetY + s, targetZ + s, 1.0f, 0.8f, 0.0f, 1.0f);
         }
 
@@ -105,9 +83,9 @@ public class WorldRenderESP {
                 float g = 0.85f;
                 float b = 0.0f;
 
-                line(bufferBuilder, matrix, 0f, 0f, 0f, (float) targetX, (float) targetY, (float) targetZ, r, g, b, 1.0f);
+                line(buffer, entry, 0f, 0f, 0f, (float) targetX, (float) targetY, (float) targetZ, r, g, b, 1.0f);
 
-                drawBoxOutline(bufferBuilder, matrix, targetX - 0.5, targetY - 0.5, targetZ - 0.5,
+                drawBoxOutline(buffer, entry, targetX - 0.5, targetY - 0.5, targetZ - 0.5,
                                targetX + 0.5, targetY + 0.5, targetZ + 0.5, r, g, b, 1.0f);
             }
         }
@@ -125,50 +103,17 @@ public class WorldRenderESP {
                 float g = 0.5f;
                 float b = 0.0f;
 
-                line(bufferBuilder, matrix, 0f, 0f, 0f, (float) targetX, (float) targetY, (float) targetZ, r, g, b, 1.0f);
+                line(buffer, entry, 0f, 0f, 0f, (float) targetX, (float) targetY, (float) targetZ, r, g, b, 1.0f);
 
-                drawBoxOutline(bufferBuilder, matrix, targetX - 1.5, targetY - 1.5, targetZ - 1.5,
+                drawBoxOutline(buffer, entry, targetX - 1.5, targetY - 1.5, targetZ - 1.5,
                                targetX + 1.5, targetY + 1.5, targetZ + 1.5, r, g, b, 1.0f);
             }
         }
 
-        // FORCE OpenGL depth test disabled RIGHT BEFORE actual GPU draw call
-        GlStateManager._disableDepthTest();
-        GlStateManager._depthMask(false);
-
-        BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
-
-        // Restore OpenGL depth state
-        GlStateManager._depthMask(true);
-        GlStateManager._enableDepthTest();
         matrices.pop();
     }
 
-    private static void setLineShader() {
-        if (!reflectionAttempted) {
-            reflectionAttempted = true;
-            for (Method m : GameRenderer.class.getDeclaredMethods()) {
-                if (m.getParameterCount() == 0 && ShaderProgram.class.isAssignableFrom(m.getReturnType())) {
-                    String name = m.getName().toLowerCase();
-                    if (name.contains("line") || name.contains("positioncolor")) {
-                        shaderMethod = m;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (shaderMethod != null) {
-            try {
-                ShaderProgram program = (ShaderProgram) shaderMethod.invoke(null);
-                if (program != null) {
-                    RenderSystem.setShader(program);
-                }
-            } catch (Exception ignored) {}
-        }
-    }
-
-    private static void drawBoxOutline(BufferBuilder builder, Matrix4f matrix, double minX, double minY, double minZ, double maxX, double maxY, double maxZ, float r, float g, float b, float a) {
+    private static void drawBoxOutline(VertexConsumer builder, MatrixStack.Entry entry, double minX, double minY, double minZ, double maxX, double maxY, double maxZ, float r, float g, float b, float a) {
         float x1 = (float) minX;
         float y1 = (float) minY;
         float z1 = (float) minZ;
@@ -177,25 +122,25 @@ public class WorldRenderESP {
         float z2 = (float) maxZ;
 
         // Bottom square
-        line(builder, matrix, x1, y1, z1, x2, y1, z1, r, g, b, a);
-        line(builder, matrix, x2, y1, z1, x2, y1, z2, r, g, b, a);
-        line(builder, matrix, x2, y1, z2, x1, y1, z2, r, g, b, a);
-        line(builder, matrix, x1, y1, z2, x1, y1, z1, r, g, b, a);
+        line(builder, entry, x1, y1, z1, x2, y1, z1, r, g, b, a);
+        line(builder, entry, x2, y1, z1, x2, y1, z2, r, g, b, a);
+        line(builder, entry, x2, y1, z2, x1, y1, z2, r, g, b, a);
+        line(builder, entry, x1, y1, z2, x1, y1, z1, r, g, b, a);
 
         // Top square
-        line(builder, matrix, x1, y2, z1, x2, y2, z1, r, g, b, a);
-        line(builder, matrix, x2, y2, z1, x2, y2, z2, r, g, b, a);
-        line(builder, matrix, x2, y2, z2, x1, y2, z2, r, g, b, a);
-        line(builder, matrix, x1, y2, z2, x1, y2, z1, r, g, b, a);
+        line(builder, entry, x1, y2, z1, x2, y2, z1, r, g, b, a);
+        line(builder, entry, x2, y2, z1, x2, y2, z2, r, g, b, a);
+        line(builder, entry, x2, y2, z2, x1, y2, z2, r, g, b, a);
+        line(builder, entry, x1, y2, z2, x1, y2, z1, r, g, b, a);
 
         // Vertical pillars
-        line(builder, matrix, x1, y1, z1, x1, y2, z1, r, g, b, a);
-        line(builder, matrix, x2, y1, z1, x2, y2, z1, r, g, b, a);
-        line(builder, matrix, x2, y1, z2, x2, y2, z2, r, g, b, a);
-        line(builder, matrix, x1, y1, z2, x1, y2, z2, r, g, b, a);
+        line(builder, entry, x1, y1, z1, x1, y2, z1, r, g, b, a);
+        line(builder, entry, x2, y1, z1, x2, y2, z1, r, g, b, a);
+        line(builder, entry, x2, y1, z2, x2, y2, z2, r, g, b, a);
+        line(builder, entry, x1, y1, z2, x1, y2, z2, r, g, b, a);
     }
 
-    private static void line(BufferBuilder builder, Matrix4f matrix, float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a) {
+    private static void line(VertexConsumer builder, MatrixStack.Entry entry, float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a) {
         float dx = x2 - x1;
         float dy = y2 - y1;
         float dz = z2 - z1;
@@ -204,7 +149,7 @@ public class WorldRenderESP {
         float ny = len > 0 ? dy / len : 1f;
         float nz = len > 0 ? dz / len : 0f;
 
-        builder.vertex(matrix, x1, y1, z1).color(r, g, b, a).normal(nx, ny, nz);
-        builder.vertex(matrix, x2, y2, z2).color(r, g, b, a).normal(nx, ny, nz);
+        builder.vertex(entry, x1, y1, z1).color(r, g, b, a).normal(entry, nx, ny, nz);
+        builder.vertex(entry, x2, y2, z2).color(r, g, b, a).normal(entry, nx, ny, nz);
     }
 }

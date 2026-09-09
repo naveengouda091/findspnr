@@ -17,9 +17,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Super-Optimized Dual-Mode Spawner & Dungeon Tracker:
+ * Super-Optimized Dual-Mode Spawner & Dungeon Tracker (1.21.11 Compatible):
  *
- * Mode 1: Direct MobSpawnerBlockEntity & BlockState scanner (Singleplayer & Vanilla servers).
+ * Mode 1: Direct MobSpawnerBlockEntity & BlockState scanner.
  * Mode 2: SeedCracker Dungeon Structure Detector (bypasses Paper/Spigot Anti-Xray Engine Mode 2).
  *
  * Feature 1: Remembers destroyed/mined spawners.
@@ -36,14 +36,15 @@ public class SpawnerTracker {
 
         tickCounter++;
 
+        Vec3d playerPos = new Vec3d(client.player.getX(), client.player.getY(), client.player.getZ());
+
         // Full scan every 20 ticks (~1s)
         if (tickCounter % 20 == 0) {
-            scanChunks(client.world, client.player.getPos());
+            scanChunks(client.world, playerPos);
             mergeDuplicates();
         }
 
         // Update distances every tick & auto-delete dungeons when player reaches them (<= 3.5m)
-        Vec3d playerPos = client.player.getPos();
         detected.entrySet().removeIf(entry -> {
             SpawnerInfo info = entry.getValue();
             info.updateDistance(playerPos);

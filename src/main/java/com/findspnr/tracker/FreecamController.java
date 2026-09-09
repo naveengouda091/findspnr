@@ -6,7 +6,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.math.Vec3d;
 
 /**
- * Client-Side Freecam Controller:
+ * Client-Side Freecam Controller (1.21.11 Compatible):
  *  - Toggled with key 'K' or command '/findspnr freecam'.
  *  - Detaches camera view and allows flying through world using WASD / Space / Shift.
  *  - Real player character body remains frozen in place.
@@ -23,7 +23,7 @@ public class FreecamController {
 
         if (client.player != null) {
             if (ModConfig.freecamEnabled) {
-                originalBodyPos = client.player.getPos();
+                originalBodyPos = new Vec3d(client.player.getX(), client.player.getY(), client.player.getZ());
                 freecamPos = client.player.getEyePos();
                 freecamYaw = client.player.getYaw();
                 freecamPitch = client.player.getPitch();

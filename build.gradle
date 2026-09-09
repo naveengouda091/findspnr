@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.9-SNAPSHOT'
+    id 'fabric-loom' version '1.17.19'
     id 'maven-publish'
 }
 
@@ -11,6 +11,13 @@ base {
 }
 
 repositories {
+    maven {
+        name = 'MinecraftLibraries'
+        url = uri("${System.getenv('APPDATA')}/.minecraft/libraries")
+        metadataSources {
+            artifact()
+        }
+    }
     mavenCentral()
     maven {
         name = 'Fabric'

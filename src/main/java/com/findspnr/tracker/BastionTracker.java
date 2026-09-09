@@ -15,7 +15,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Bastion Remnant Tracker:
+ * Bastion Remnant Tracker (1.21.11 Compatible):
  * Scans loaded Nether chunks for Gilded Blackstone and Polished Blackstone Bricks
  * (which naturally generate exclusively in Nether Bastions).
  * Activated via command (/findspnr bastion).
@@ -33,14 +33,15 @@ public class BastionTracker {
 
         tickCounter++;
 
+        Vec3d playerPos = new Vec3d(client.player.getX(), client.player.getY(), client.player.getZ());
+
         // Full scan every 20 ticks (~1s)
         if (tickCounter % 20 == 0) {
-            scanChunks(client.world, client.player.getPos());
+            scanChunks(client.world, playerPos);
             mergeDuplicates();
         }
 
         // Update distances every tick & auto-remove when player arrives (distance <= 3.5m)
-        Vec3d playerPos = client.player.getPos();
         detected.entrySet().removeIf(entry -> {
             BastionInfo info = entry.getValue();
             info.updateDistance(playerPos);
