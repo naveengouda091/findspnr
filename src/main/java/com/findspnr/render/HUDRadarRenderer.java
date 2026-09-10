@@ -61,7 +61,17 @@ public class HUDRadarRenderer {
         int x = 10;
         int y = 10;
 
-        ctx.drawTextWithShadow(tr, "§c§l[FindSpnr] §fSpawners: §e" + spawners.size(), x, y, COL_HEADER);
+        String title;
+        if (ModConfig.findSpawners && ModConfig.findDungeons) {
+            title = "§c§l[FindSpnr] §fTargets: §e" + spawners.size();
+        } else if (ModConfig.findSpawners) {
+            title = "§c§l[FindSpnr] §fOnly Spawners: §e" + spawners.size();
+        } else if (ModConfig.findDungeons) {
+            title = "§c§l[FindSpnr] §fOnly Dungeons: §e" + spawners.size();
+        } else {
+            title = "§c§l[FindSpnr] §7(Filters OFF)";
+        }
+        ctx.drawTextWithShadow(tr, title, x, y, COL_HEADER);
         y += 12;
 
         if (!spawners.isEmpty()) {

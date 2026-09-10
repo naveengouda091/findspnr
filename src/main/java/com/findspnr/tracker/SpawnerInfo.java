@@ -4,7 +4,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 /**
- * Immutable value-object that describes one detected monster spawner.
+ * Immutable value-object that describes one detected monster spawner or dungeon.
  */
 public class SpawnerInfo {
 
@@ -37,12 +37,16 @@ public class SpawnerInfo {
         this.distance = Math.sqrt(pos.getSquaredDistance(playerPos.x, playerPos.y, playerPos.z));
     }
 
+    public boolean isDungeon() {
+        return "Dungeon".equalsIgnoreCase(entityType);
+    }
+
     /**
-     * Returns a human-readable name such as "Zombie Spawner" or "Monster Spawner"
-     * when the entity type is unknown.
+     * Returns a human-readable name such as "Zombie Spawner", "Dungeon Floor", or "Monster Spawner".
      */
     public String getFormattedName() {
         if (entityType == null || entityType.isBlank()) return "Monster Spawner";
+        if (isDungeon()) return "Dungeon Floor";
         String name = entityType.replace("minecraft:", "").replace("_", " ").trim();
         if (!name.isEmpty()) name = Character.toUpperCase(name.charAt(0)) + name.substring(1);
         return name + " Spawner";

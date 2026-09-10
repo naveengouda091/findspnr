@@ -19,8 +19,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Super-Optimized Dual-Mode Spawner & Dungeon Tracker (1.21.11 Compatible):
  *
- * Mode 1: Direct MobSpawnerBlockEntity & BlockState scanner.
- * Mode 2: SeedCracker Dungeon Structure Detector (bypasses Paper/Spigot Anti-Xray Engine Mode 2).
+ * Mode 1: Direct MobSpawnerBlockEntity & BlockState scanner (findSpawners toggle).
+ * Mode 2: SeedCracker Dungeon Structure Detector (findDungeons toggle).
  *
  * Feature 1: Remembers destroyed/mined spawners.
  * Feature 2: Auto-removes dungeons from the list/radar as soon as you walk within 3.5 blocks of them!
@@ -33,6 +33,7 @@ public class SpawnerTracker {
 
     public static void tick(MinecraftClient client) {
         if (!ModConfig.enabled || client.world == null || client.player == null) return;
+        if (!ModConfig.findSpawners && !ModConfig.findDungeons) return;
 
         tickCounter++;
 
@@ -88,27 +89,29 @@ public class SpawnerTracker {
                 WorldChunk chunk = world.getChunk(cx, cz);
 
                 // ── METHOD 1: Direct Block Entity Scan (O(1) fast lookup) ────────────
-                for (BlockEntity be : chunk.getBlockEntities().values()) {
-                    if (be instanceof MobSpawnerBlockEntity spawnerBe) {
-                        BlockPos pos = spawnerBe.getPos();
-                        if (destroyedSpawners.contains(pos)) continue;
+                if (ModConfig.findSpawners) {
+                    for (BlockEntity be : chunk.getBlockEntities().values()) {
+                        if (be instanceof MobSpawnerBlockEntity spawnerBe) {
+                            BlockPos pos = spawnerBe.getPos();
+                            if (destroyedSpawners.contains(pos)) continue;
 
-                        String entityType = "unknown";
-                        try {
-                            var logic = spawnerBe.getLogic();
-                            if (logic != null) {
-                                var entity = logic.getRenderedEntity(world, pos);
-                                if (entity != null) {
-                                    entityType = entity.getType().getUntranslatedName();
+                            String entityType = "unknown";
+                            try {
+                                var logic = spawnerBe.getLogic();
+                                if (logic != null) {
+                                    var entity = logic.getRenderedEntity(world, pos);
+                                    if (entity != null) {
+                                        entityType = entity.getType().getUntranslatedName();
+                                    }
                                 }
-                            }
-                        } catch (Exception ignored) {}
+                            } catch (Exception ignored) {}
 
-                        SpawnerInfo info = new SpawnerInfo(pos, entityType);
-                        info.updateDistance(playerPos);
+                            SpawnerInfo info = new SpawnerInfo(pos, entityType);
+                            info.updateDistance(playerPos);
 
-                        removeNearbyApproximate(pos);
-                        detected.put(pos, info);
+                            removeNearbyApproximate(pos);
+                            detected.put(pos, info);
+                        }
                     }
                 }
 
@@ -123,8 +126,23 @@ public class SpawnerTracker {
                     if (section == null || section.isEmpty()) continue;
 
                     // FAST PASS: Check if 16x16x16 section has spawner or mossy cobble
-                    if (!section.hasAny(state -> state.isOf(Blocks.SPAWNER) || state.isOf(Blocks.MOSSY_COBBLESTONE))) {
-                        continue; // Skips 4096 blocks instantly in 0.001ms!
+                    boolean matchSpawner = ModConfig.findSpawners;
+                    boolean matchDungeon = ModConfig.findDungeons;
+
+                    if (matchSpawner && matchDungeon) {
+                        if (!section.hasAny(state -> state.isOf(Blocks.SPAWNER) || state.isOf(Blocks.MOSSY_COBBLESTONE))) {
+                            continue;
+                        }
+                    } else if (matchSpawner) {
+                        if (!section.hasAny(state -> state.isOf(Blocks.SPAWNER))) {
+                            continue;
+                        }
+                    } else if (matchDungeon) {
+                        if (!section.hasAny(state -> state.isOf(Blocks.MOSSY_COBBLESTONE))) {
+                            continue;
+                        }
+                    } else {
+                        continue;
                     }
 
                     int sectionBottomY = worldBottomY + (i * 16);
@@ -140,13 +158,13 @@ public class SpawnerTracker {
 
                                 BlockState state = section.getBlockState(x, y, z);
 
-                                if (state.isOf(Blocks.SPAWNER)) {
+                                if (ModConfig.findSpawners && state.isOf(Blocks.SPAWNER)) {
                                     BlockPos immutablePos = mutablePos.toImmutable();
                                     removeNearbyApproximate(immutablePos);
                                     SpawnerInfo info = new SpawnerInfo(immutablePos, "Monster");
                                     info.updateDistance(playerPos);
                                     detected.putIfAbsent(immutablePos, info);
-                                } else if (state.isOf(Blocks.MOSSY_COBBLESTONE)) {
+                                } else if (ModConfig.findDungeons && state.isOf(Blocks.MOSSY_COBBLESTONE)) {
                                     checkDungeonFloor(world, mutablePos, playerPos);
                                 }
                             }
@@ -212,7 +230,7 @@ public class SpawnerTracker {
         detected.entrySet().removeIf(entry -> {
             BlockPos p = entry.getKey();
             SpawnerInfo info = entry.getValue();
-            return info.getEntityType().equals("Dungeon") &&
+            return info.isDungeon() &&
                     Math.abs(p.getX() - exactPos.getX()) <= 4 &&
                     Math.abs(p.getZ() - exactPos.getZ()) <= 4 &&
                     Math.abs(p.getY() - exactPos.getY()) <= 2;
@@ -235,9 +253,9 @@ public class SpawnerTracker {
                     Math.abs(p1.getZ() - p2.getZ()) <= 4 &&
                     Math.abs(p1.getY() - p2.getY()) <= 2) {
 
-                    if (!info1.getEntityType().equals("Dungeon")) {
+                    if (!info1.isDungeon()) {
                         detected.remove(p2);
-                    } else if (!info2.getEntityType().equals("Dungeon")) {
+                    } else if (!info2.isDungeon()) {
                         detected.remove(p1);
                         break;
                     } else {
@@ -249,7 +267,15 @@ public class SpawnerTracker {
     }
 
     public static List<SpawnerInfo> getDetectedSpawners() {
-        List<SpawnerInfo> list = new ArrayList<>(detected.values());
+        List<SpawnerInfo> list = new ArrayList<>();
+        for (SpawnerInfo info : detected.values()) {
+            boolean isDungeon = info.isDungeon();
+            if (isDungeon && ModConfig.findDungeons) {
+                list.add(info);
+            } else if (!isDungeon && ModConfig.findSpawners) {
+                list.add(info);
+            }
+        }
         list.sort(Comparator.comparingDouble(SpawnerInfo::getDistance));
         return Collections.unmodifiableList(list);
     }

@@ -15,6 +15,12 @@ public class ModConfig {
     /** Draw the HUD radar in the top-right corner */
     public static boolean renderHUDRadar = true;
 
+    /** Spawner Finder toggle (/findspnr spawner or /findspnr filter spawners) – tracks direct spawner blocks */
+    public static boolean findSpawners = true;
+
+    /** Dungeon Finder toggle (/findspnr dungeon or /findspnr filter dungeons) – tracks dungeon structures */
+    public static boolean findDungeons = true;
+
     /** Base Finder toggle (/findspnr base) – tracks Shulker Boxes */
     public static boolean renderBaseFinder = false;
 

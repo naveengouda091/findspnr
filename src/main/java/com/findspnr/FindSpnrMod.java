@@ -35,7 +35,7 @@ import java.util.List;
  *
  * Keybinding   : G  → toggle entire mod
  * Keybinding   : K  → toggle Freecam mode
- * Chat commands: /findspnr toggle | base | bastion | freecam | esp | radar | list
+ * Chat commands: /findspnr toggle | spawner | dungeon | filter <all|spawners|dungeons> | base | bastion | freecam | esp | radar | list
  */
 public class FindSpnrMod implements ClientModInitializer {
 
@@ -107,6 +107,57 @@ public class FindSpnrMod implements ClientModInitializer {
                                     "§c[FindSpnr] §fMod " + (ModConfig.enabled ? "§aENABLED" : "§cDISABLED")));
                             return 1;
                         }))
+                        .then(ClientCommandManager.literal("spawner").executes(ctx -> {
+                            ModConfig.findSpawners = !ModConfig.findSpawners;
+                            ctx.getSource().sendFeedback(Text.literal(
+                                    "§c[FindSpnr] §fSpawner Detection: " +
+                                            (ModConfig.findSpawners ? "§aENABLED ✔" : "§cDISABLED ✖")));
+                            return 1;
+                        }))
+                        .then(ClientCommandManager.literal("spawners").executes(ctx -> {
+                            ModConfig.findSpawners = !ModConfig.findSpawners;
+                            ctx.getSource().sendFeedback(Text.literal(
+                                    "§c[FindSpnr] §fSpawner Detection: " +
+                                            (ModConfig.findSpawners ? "§aENABLED ✔" : "§cDISABLED ✖")));
+                            return 1;
+                        }))
+                        .then(ClientCommandManager.literal("dungeon").executes(ctx -> {
+                            ModConfig.findDungeons = !ModConfig.findDungeons;
+                            ctx.getSource().sendFeedback(Text.literal(
+                                    "§c[FindSpnr] §fDungeon Detection: " +
+                                            (ModConfig.findDungeons ? "§aENABLED ✔" : "§cDISABLED ✖")));
+                            return 1;
+                        }))
+                        .then(ClientCommandManager.literal("dungeons").executes(ctx -> {
+                            ModConfig.findDungeons = !ModConfig.findDungeons;
+                            ctx.getSource().sendFeedback(Text.literal(
+                                    "§c[FindSpnr] §fDungeon Detection: " +
+                                            (ModConfig.findDungeons ? "§aENABLED ✔" : "§cDISABLED ✖")));
+                            return 1;
+                        }))
+                        .then(ClientCommandManager.literal("filter")
+                                .then(ClientCommandManager.literal("all").executes(ctx -> {
+                                    ModConfig.findSpawners = true;
+                                    ModConfig.findDungeons = true;
+                                    ctx.getSource().sendFeedback(Text.literal(
+                                            "§c[FindSpnr] §fFilter set to: §aAll (Spawners & Dungeons)"));
+                                    return 1;
+                                }))
+                                .then(ClientCommandManager.literal("spawners").executes(ctx -> {
+                                    ModConfig.findSpawners = true;
+                                    ModConfig.findDungeons = false;
+                                    ctx.getSource().sendFeedback(Text.literal(
+                                            "§c[FindSpnr] §fFilter set to: §aOnly Spawners (Ignoring Dungeons)"));
+                                    return 1;
+                                }))
+                                .then(ClientCommandManager.literal("dungeons").executes(ctx -> {
+                                    ModConfig.findSpawners = false;
+                                    ModConfig.findDungeons = true;
+                                    ctx.getSource().sendFeedback(Text.literal(
+                                            "§c[FindSpnr] §fFilter set to: §aOnly Dungeons (Ignoring Other Spawners)"));
+                                    return 1;
+                                }))
+                        )
                         .then(ClientCommandManager.literal("base").executes(ctx -> {
                             ModConfig.renderBaseFinder = !ModConfig.renderBaseFinder;
                             ctx.getSource().sendFeedback(Text.literal(
@@ -151,8 +202,10 @@ public class FindSpnrMod implements ClientModInitializer {
                                         "§c[FindSpnr] §7No targets detected in loaded chunks."));
                             } else {
                                 if (!spawners.isEmpty()) {
+                                    String label = (ModConfig.findSpawners && ModConfig.findDungeons) ? "target(s)" :
+                                                   (ModConfig.findSpawners ? "spawner(s)" : "dungeon(s)");
                                     ctx.getSource().sendFeedback(Text.literal(
-                                            "§c[FindSpnr] §aFound §e" + spawners.size() + " §aspawner(s):"));
+                                            "§c[FindSpnr] §aFound §e" + spawners.size() + " §a" + label + ":"));
                                     for (SpawnerInfo info : spawners) {
                                         BlockPos p = info.getPos();
                                         ctx.getSource().sendFeedback(Text.literal(String.format(
